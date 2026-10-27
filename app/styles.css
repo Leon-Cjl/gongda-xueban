@@ -475,6 +475,8 @@ dialog::backdrop{background:var(--scrim)}
  html:not([data-motion=off]) dialog[open].closing::backdrop{animation:fade-out .17s forwards}
  /* 预约栏滑上来、条件表单展开 */
  html:not([data-motion=off]) .sel-panel.appear{animation:panel-up .26s cubic-bezier(.2,.8,.2,1)}
+ html:not([data-motion=off]) .card.current.just-booked{animation:booked-in .5s cubic-bezier(.2,.9,.3,1)}
+ html:not([data-motion=off]) .record.just-booked{animation:booked-row 1.2s ease-out}
  html:not([data-motion=off]) .room-form.appear{animation:rise .24s cubic-bezier(.2,.8,.2,1)}
  /* 按下时轻轻缩一下 */
  html:not([data-motion=off]) :is(.btn,.chip,.seat,.area-row,.room-main,.achv,.icon-btn,.nav button):active{transform:scale(.96);transition:transform .08s}
@@ -655,3 +657,8 @@ html[data-platform=android] .appbar,html[data-platform=android] .nav{-webkit-bac
 
 /* 底栏在首帧就按平台显示（boot.js 先标好平台）：手机没有“任务”页，电脑没有入馆码 */
 html[data-platform=android] .nav [data-page=tasks],html[data-platform=windows] .nav [data-page=pass]{display:none}
+/* 刚约到的座位：卡片升起并亮一圈主题色 */
+@keyframes booked-in{0%{opacity:0;transform:translateY(12px) scale(.98);box-shadow:0 0 0 0 var(--primary)}60%{opacity:1;transform:none;box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 35%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes booked-row{0%{background:color-mix(in srgb,var(--primary) 22%,transparent)}100%{background:transparent}}
+/* 正在取消 / 结束使用的那张卡片：变淡、不能再点 */
+.card.current.working,.record.working{opacity:.5;pointer-events:none;transition:opacity .2s}

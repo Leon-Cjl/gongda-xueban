@@ -2,7 +2,7 @@
    学校请求一律经本机客户端转发；这里负责界面状态、预约调度与本机保存。 */
 (() => {
 'use strict';
-const VERSION = '0.9.22';
+const VERSION = '0.9.25';
 // 公开版：单账号、只有“立即预约”；有可收起的“支持作者”卡片和《用户协议与隐私说明》。
 const PUBLIC = window.CampusEdition === 'public';
 const SHOWN_VERSION = PUBLIC ? (window.CampusEditionVersion || '') : VERSION;
@@ -87,6 +87,9 @@ const state = {
  roomDay: null, roomFind: '', roomFindDate: '', calMonth: '', roomLoading: false, roomsStale: false, roomLimit: 0, libraryAuto: {busy: false, needsUser: false},
  preferences: {...(NW ? {mascotTheme: 'naiwa'} : {}), theme: 'system', motion: 'auto', accent: 'blue', seatNotify: true, roomQuery: null, seatFilter: {query: '', freeOnly: true, favoriteOnly: false}, areaFilter: {floor: '', freeOnly: false, sort: ''}, checkinLead: 15, countdown: null, manualReminders: [], firedReminders: [], desktopNotify: true}
 };
+// 读取标记按用途分开：读入馆记录、提交签退等不再挡住换日期和选座。state.loading 只是“有任何一种在读”，给进度条和通用判断用。
+state.reading = {library: false, current: false, records: false, op: false, account: false};
+Object.defineProperty(state, 'loading', {get: () => Object.values(state.reading).some(Boolean), set: v => { state.reading.account = !!v; }});
 const pending = new Map();
 let seq = 0, toastTimer, undoAction = null, accountBusy = false, creatingTasks = false, booker, lastPage = '', pendingLeave = null, leaving = false, cancelling = false, checkingOut = false, untilToken = 0, roomDefaultsApplied = false, lastLive = '', teachingConnecting = false, lastReminders = '';
 const lastStatus = new Map();
@@ -133,7 +136,7 @@ function tick() { if (Date.now() - lastTick < 700) return; lastTick = Date.now()
 let lastRetry = 0;
 function retryFailedReads() {
  if (!window.CampusRuntimeReady || state.loading || Date.now() - lastRetry < 60000 || $('#dialog').open) return;
- if (state.currentError && state.libraryConnected && ['library', 'me'].includes(state.page)) { lastRetry = Date.now(); busy(refreshCurrent, {quiet: true}); }
+ if (state.currentError && state.libraryConnected && ['library', 'me'].includes(state.page)) { lastRetry = Date.now(); busy(refreshCurrent, {quiet: true, kind: 'current'}); }
  else if (state.statusError && state.libraryConnected && state.page === 'me' && !state.statusLoading) { lastRetry = Date.now(); loadAccountStatus({force: true}); }
 }
 // 过了零点：空教室的当前周跟着算，查询条件原来是“本周、今天”的换成新的今天；已查的结果保留，日期按新的一天显示（会写成“昨天”）。
@@ -261,6 +264,12 @@ function toast(text, undo) {
 }
 function hideToast() {
  const el = $('#toast');
+ // 先淡出再隐藏；淡出途中又来了新提示就不隐藏
+ if (motionOn() && !el.classList.contains('hide') && el.animate) { const text = el.innerHTML; el.animate([{opacity: 1}, {opacity: 0, transform: 'translate(-50%, 8px)'}], {duration: 160, easing: 'ease-in'}).finished.then(() => { if (el.innerHTML === text) hideToastNow(); }).catch(() => {}); return; }
+ hideToastNow();
+}
+function hideToastNow() {
+ const el = $('#toast');
  el.classList.add('hide');
  if (el.hidePopover) try { el.hidePopover(); } catch (e) {}
  undoAction = null;
@@ -287,11 +296,13 @@ function teachingExpired(e) {
  return true;
 }
 function report(e) { haptic('reject'); if (teachingExpired(e)) return; if (e.code === 'AUTH') fail(e); toast(e.message || String(e)); }
-async function busy(fn, {quiet = false} = {}) {
- if (state.loading) { if (!quiet) toast('正在读取学校数据，请稍候'); return; }
- state.loading = true; state.error = ''; render();
- try { return await fn(); } catch (e) { if (e.code !== 'STALE') fail(e); } finally { state.loading = false; render(); }
+async function busy(fn, {quiet = false, kind = 'library'} = {}) {
+ // 同一种读取不并发；切换账号时什么都不读
+ if (state.reading[kind] || state.reading.account) { if (!quiet) toast('正在读取学校数据，请稍候'); return; }
+ state.reading[kind] = true; state.error = ''; render();
+ try { return await fn(); } catch (e) { if (e.code !== 'STALE') fail(e); } finally { state.reading[kind] = false; render(); }
 }
+const opBusy = fn => busy(fn, {kind: 'op'});
 // 每次读图书馆（换日期、进区域、返回区域列表）编一个号；读回来时号已经变了，说明人已经离开这次查询，结果丢掉，不把页面又拽回去。
 let libraryEpoch = 0;
 function checkLibraryRead(epoch) { if (epoch !== libraryEpoch) throw Object.assign(Error('已离开这次查询'), {code: 'STALE'}); }
@@ -420,12 +431,14 @@ function updateTaskBadge() {
  const target = navPages().includes('tasks') ? 'tasks' : 'me';
  $$('.nav-badge').forEach(el => { const on = el.dataset.for === target && n > 0; el.hidden = !on; el.textContent = on ? text : ''; });
 }
+let dockNav = -1, dockAll = -1;
 function updateDock() {
  requestAnimationFrame(() => {
   const height = el => { if (!el) return 0; const s = getComputedStyle(el); return s.position === 'fixed' && s.display !== 'none' ? el.offsetHeight : 0; };
   const nav = height($('.nav')), side = height($('.lib-side'));
-  document.documentElement.style.setProperty('--nav-h', nav + 'px');
-  document.documentElement.style.setProperty('--dock-h', nav + side + 'px');
+  // 高度没变就不写：每次重画后都写一遍会让整页样式再算一次
+  if (nav !== dockNav) { dockNav = nav; document.documentElement.style.setProperty('--nav-h', nav + 'px'); }
+  if (nav + side !== dockAll) { dockAll = nav + side; document.documentElement.style.setProperty('--dock-h', dockAll + 'px'); }
  });
 }
 
@@ -460,7 +473,8 @@ function currentCards() {
   const locked = leaveLocked(r), away = !!r.temporarilyAway, no = String(r.no || r.name || '');
   const status = locked ? '暂离确认中' : r.statusMsg || r.status_name || ('学校状态 ' + (r.status ?? '—'));
   const canLeave = r.canTemporaryLeave && !away && !locked, rec = C.matchRecord(state.records, r), canCancel = C.cancellableRecord(rec) && !away && !locked;
-  return '<section class="card current"><div class="current-top"><span class="overline">当前预约</span><span class="badge ' + (away || locked ? 'warn' : 'ok') + '">' + esc(status) + '</span><button class="icon-btn" data-action="refreshCurrent" aria-label="刷新当前预约">' + I.refresh + '</button></div>'
+  const fresh = takeJustBooked(no);
+  return '<section class="card current' + (fresh ? ' just-booked' : '') + (opWorking(r.id, rec?.id) ? ' working' : '') + '"' + (opWorking(r.id, rec?.id) ? ' aria-busy="true"' : '') + '><div class="current-top"><span class="overline">当前预约</span><span class="badge ' + (away || locked ? 'warn' : 'ok') + '">' + esc(status) + '</span><button class="icon-btn" data-action="refreshCurrent" aria-label="刷新当前预约">' + I.refresh + '</button></div>'
    + '<h2>' + esc(r.nameMerge || r.areaName || '图书馆') + ' <span class="seat-no">' + esc(no) + (/^[A-Za-z]?\d+$/.test(no) ? ' 号' : '') + '</span></h2>'
    + (reservationSpan(r).text ? '<p class="muted small">' + esc(reservationSpan(r).text) + '</p>' : '')
    + (away ? '<p class="muted small">已暂离，请按学校规定时限回座签到</p>' : '')
@@ -472,7 +486,7 @@ function currentCards() {
 function upcomingCards() {
  const list = C.upcomingBookings(state.records, state.current).slice(0, 4);
  if (!list.length) return '';
- return '<section class="card list-card upcoming"><div class="list-head"><h2>待使用的预约</h2><span class="muted small">学校记录</span></div>' + list.map(r => '<div class="record"><div><strong>' + esc((r.nameMerge || r.areaName || '图书馆') + ' ' + String(r.no ?? r.name ?? '')) + '</strong><span class="muted">' + esc(bookingTime(r)) + '</span></div><button class="btn tonal sm" data-cancel-booking="' + esc(r.id) + '">取消预约</button></div>').join('') + '</section>';
+ return '<section class="card list-card upcoming"><div class="list-head"><h2>待使用的预约</h2><span class="muted small">学校记录</span></div>' + list.map(r => '<div class="record' + (takeJustBooked(r.no ?? r.name ?? '') ? ' just-booked' : '') + (opWorking(r.id) ? ' working' : '') + '"><div><strong>' + esc((r.nameMerge || r.areaName || '图书馆') + ' ' + String(r.no ?? r.name ?? '')) + '</strong><span class="muted">' + esc(bookingTime(r)) + '</span></div><button class="btn tonal sm" data-cancel-booking="' + esc(r.id) + '">取消预约</button></div>').join('') + '</section>';
 }
 function bookingTime(r) { const t = C.reservationTimes(r); return t ? dayName(t.begin.day) + ' ' + t.begin.time + '–' + t.end.time : String(r.beginTime || ''); }
 function seatNotifyTip() {
@@ -523,7 +537,9 @@ async function refreshNotify() { if (state.platform === 'android') state.notify 
 function onResume() {
  if (Date.now() - (state.preferences.opens?.at || 0) > 30 * 60000) countOpen();
  refreshNotify().then(() => { syncLiveSeat(); const d = $('#dialog'); if (d.open && d.dataset.kind === 'settings') settingsDialog(); else render(); });
- if (state.libraryConnected && !state.loading && Date.now() - state.currentAt > 60000) busy(refreshCurrent, {quiet: true});
+ if (state.libraryConnected && !state.reading.current && Date.now() - state.currentAt > 60000) busy(refreshCurrent, {quiet: true, kind: 'current'});
+ // 在座位页离开一会儿再回来：座位多半已经变了，超过 2 分钟就悄悄重读，已选的、还空着的留着
+ if (state.page === 'library' && state.libraryConnected && state.areaId && state.info && !state.reading.library && Date.now() - (state.seatsAt || 0) > 120000) refreshAfterBooking({keep: true});
  if (state.page === 'rooms' && !onlineRooms()) autoConnectTeaching();
 }
 function haptic(kind) { if (state.platform === 'android' && state.preferences.haptics !== false) host('haptic', {kind}).catch(() => {}); }
@@ -541,7 +557,7 @@ function quickTomorrowChip(list) {
 async function quickTomorrow() {
  const favs = state.favorites.filter(f => f.type === 'seat');
  if (!favs.length) return;
- if (state.loading) { toast('正在读取学校数据，请稍候'); return; }
+ if (state.reading.library) { toast('正在读取学校数据，请稍候'); return; }
  const area = String(favs[0].areaId), want = favs.filter(f => same(f.areaId, area)), tomorrow = addDays(C.nowChina(), 1);
  haptic('tick');
  state.day = tomorrow; state.selection = [];
@@ -569,7 +585,7 @@ function queryBar(withLibraries) {
 function shownAreas() { return state.preferences.hideBorrow === false ? state.areas : state.areas.filter(a => !/借还书|借书|还书/.test(String(a.name || ''))); }
 function areaList() {
  const areas = shownAreas();
- if (!areas.length && state.loading) return '<section class="card list-card" aria-busy="true"><div class="list-head"><h2>选择区域</h2></div>' + Array.from({length: 5}, () => '<div class="skel-row"><i class="skel w60"></i><i class="skel w30"></i></div>').join('') + '</section>';
+ if (!areas.length && state.reading.library) return '<section class="card list-card" aria-busy="true"><div class="list-head"><h2>选择区域</h2></div>' + Array.from({length: 5}, () => '<div class="skel-row"><i class="skel w60"></i><i class="skel w30"></i></div>').join('') + '</section>';
  if (!areas.length) return '<section class="card"><div class="empty"><h3>没有可展示的区域</h3><p>学校没有返回阅览区域。</p><div class="actions center"><button class="btn tonal" data-action="refresh">刷新</button><button class="btn text" data-action="officialLibrary">学校页面</button></div></div></section>';
  const f = state.preferences.areaFilter, floors = C.areaFloors(areas), list = C.filterAreas(areas, {...f, query: state.areaQuery});
  const floorChip = (v, label) => '<button class="chip' + (f.floor === v ? ' on' : '') + '" data-area-floor="' + esc(v) + '" aria-pressed="' + (f.floor === v) + '">' + esc(label) + '</button>';
@@ -643,14 +659,14 @@ async function loadLibrary({quiet = false} = {}) {
 }
 async function fetchSeats(id, keep = [], epoch = libraryEpoch) {
  const d = await api('seats', {areaId: id, day: state.day, start: '', end: ''});
- checkLibraryRead(epoch); state.areaId = id; state.info = d; state.seats = d.seats || []; state.kind = d.kind; state.start = d.start; state.end = d.end;
+ checkLibraryRead(epoch); state.seatsAt = Date.now(); state.areaId = id; state.info = d; state.seats = d.seats || []; state.kind = d.kind; state.start = d.start; state.end = d.end;
  state.selection = keep.map(s => state.seats.find(x => same(x.id, s.id) && x.available)).filter(Boolean);
  const segments = d.segments || [];
  state.segment = segments.length === 1 ? String(segments[0].id) : segments.some(x => same(x.id, state.segment)) ? state.segment : '';
 }
 async function loadSeats(id, reset = false) {
  // 进新区域：马上换成座位页的骨架，座位到了再填上；当前预约在座位画出来之后再读。
- if (!state.loading && (!same(state.areaId, id) || !state.info)) { state.openingArea = id; state.info = null; haptic('tap'); transition('forward', render); }
+ if (!state.reading.library && (!same(state.areaId, id) || !state.info)) { state.openingArea = id; state.info = null; haptic('tap'); transition('forward', render); }
  return busy(async () => {
   const opening = !same(state.areaId, id) || !state.info, keep = reset || opening ? [] : state.selection;
   const epoch = ++libraryEpoch;
@@ -663,7 +679,7 @@ async function loadSeats(id, reset = false) {
  });
 }
 // 学校数据还在读时不让换日期、区域或选座：否则日期标签变了，座位却还是上一次读到的那天。
-function libraryInputLocked() { if (!state.loading) return false; toast('数据读取完成后再切换日期或区域'); render(); return true; }
+function libraryInputLocked() { if (!state.reading.library && !state.reading.account) return false; toast('数据读取完成后再切换日期或区域'); render(); return true; }
 function backToAreas() { haptic('tick'); ++libraryEpoch; state.openingArea = ''; state.info = null; state.seats = []; state.selection = []; state.areaId = ''; transition('back', () => { render(); window.scrollTo(0, 0); }); save().catch(() => {}); }
 async function changeDay(day) {
  if (libraryInputLocked()) return;
@@ -677,10 +693,23 @@ async function changeLibrary(id) {
  state.libraryId = id; state.areaId = ''; state.info = null; state.selection = [];
  await loadLibrary();
 }
+// 选座、取消选座只改动到的座位按钮和已选面板，不整页重画；页面结构对不上时退回整页重画
+function patchSeats(ids) {
+ const side = $('.lib-side'), grid = $('#seatGrid');
+ if (state.page !== 'library' || !side || !grid || $('#dialog').open) return false;
+ for (const id of ids) {
+  const el = grid.querySelector('.seat[data-seat="' + CSS.escape(String(id)) + '"]'), s = state.seats.find(x => same(x.id, id));
+  if (el && s) el.outerHTML = seatButton(s);
+ }
+ side.innerHTML = selectionPanel();
+ updateDock();
+ return true;
+}
 function toggleSeat(id) {
  if (libraryInputLocked()) return;
  const seat = state.seats.find(x => same(x.id, id));
  if (!seat?.available) return;
+ const touched = new Set([...state.selection.map(x => String(x.id)), String(seat.id)]);
  poppedSeat = String(seat.id); setTimeout(() => { poppedSeat = ''; }, 0);
  const wasEmpty = !state.selection.length;
  const i = state.selection.findIndex(x => same(x.id, seat.id));
@@ -689,7 +718,10 @@ function toggleSeat(id) {
  else { toast('最多选择 3 个座位'); haptic('reject'); return; }
  haptic('tick');
  panelAppear = wasEmpty && state.selection.length > 0;
- render();
+ for (const x of state.selection) touched.add(String(x.id));
+ const panel = !state.selection.length && motionOn() && $('.sel-panel:not(.empty)');
+ if (panel?.animate) { panel.querySelectorAll('.sel-chip').forEach(c => c.remove()); panel.animate([{transform: 'none', opacity: 1}, {transform: 'translateY(100%)', opacity: .4}], {duration: 170, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards'}); const seatEl = $('.seat[data-seat="' + CSS.escape(String(seat.id)) + '"]'); seatEl?.classList.remove('sel'); seatEl?.querySelector('.order')?.remove(); seatEl?.setAttribute('aria-pressed', 'false'); setTimeout(() => { if (!state.selection.length && !patchSeats(touched)) render(); }, 170); return; }
+ if (!patchSeats(touched)) render();
  panelAppear = false;
 }
 function baseTask() { return {accountId: state.activeAccountId, accountName: account().label, areaId: state.areaId, areaName: state.info?.name || '', day: state.day, start: state.start, end: state.end, kind: state.kind, segment: state.segment, seats: state.selection.map(x => ({id: x.id, no: x.no}))}; }
@@ -714,24 +746,49 @@ async function refreshCurrent() {
 
 /* ---------- 预约流程 ---------- */
 // 弹窗打开时记下要约的内容：确认前座位列表在后台刷新、选择被清掉，提交的仍是弹窗里看到的那一份。
-let pendingBooking = null;
+let pendingBooking = null, justBooked = null;
+// 刚约到的座位在当前预约或待使用列表里第一次露面时高亮一次；结果弹窗还盖着时先不算，免得动画播在弹窗后面
+function takeJustBooked(no) {
+ const d = $('#dialog'), covered = d.open && !d.classList.contains('closing');
+ const hit = !covered && justBooked && Date.now() < justBooked.until && justBooked.no && String(no) === justBooked.no;
+ if (hit) justBooked = null;
+ return hit;
+}
 function bookDialog() {
  if (libraryInputLocked() || !state.info || !state.selection.length) return;
  const t = baseTask();
  if (state.kind === 1 && !state.segment) { toast('请先选择学校固定时段'); return; }
  pendingBooking = structuredClone(t);
- showDialog('<h2>确认立即预约</h2>' + summary([['区域', esc(t.areaName)], ['日期', esc(dayName(t.day) + ' ' + md(t.day))], ['时段', esc(timeText())], ['座位', t.seats.map(s => esc(s.no)).join(' → ')]]) + '<p class="muted small">按顺序尝试，约到一个即停止。' + (PUBLIC ? '仅限本人使用，请遵守《预约须知》，不得代约、转让或倒卖座位。' : '') + '</p><div class="dialog-actions"><button class="btn text" data-action="closeDialog">取消</button><button class="btn filled" data-action="confirmBook">确认预约</button></div>', 'book');
+ // 那天已经有预约：先说清楚，学校通常同一时段只允许一个预约
+ const today = C.nowChina(), sameDay = [...state.current, ...C.upcomingBookings(state.records, state.current)].filter(r => (C.reservationTimes(r, today)?.begin.day || '') === t.day);
+ const clash = sameDay.length ? '<div class="banner warn small"><span>' + esc(dayName(t.day)) + '已有预约：' + sameDay.map(r => esc((r.nameMerge || r.areaName || '图书馆') + ' ' + (r.no || r.name || '') + ' 号')).join('、') + '。学校可能不允许重复预约，以学校结果为准。</span></div>' : '';
+ showDialog('<h2>确认立即预约</h2>' + clash + summary([['区域', esc(t.areaName)], ['日期', esc(dayName(t.day) + ' ' + md(t.day))], ['时段', esc(timeText())], ['座位', t.seats.map(s => esc(s.no)).join(' → ')]]) + '<p class="muted small">按顺序尝试，约到一个即停止。' + (PUBLIC ? '仅限本人使用，请遵守《预约须知》，不得代约、转让或倒卖座位。' : '') + '</p><div class="dialog-actions"><button class="btn text" data-action="closeDialog">取消</button><button class="btn filled" data-action="confirmBook">确认预约</button></div>', 'book');
 }
 async function confirmBook() {
  if (creatingTasks || !pendingBooking || !$('#dialog').open || $('#dialog').dataset.kind !== 'book') return;
- const t = C.validateTask({...pendingBooking, fireAt: new Date(Date.now() + 1000).toISOString()});
- // 连点“确认预约”只算一次
- const button = $('#dialog [data-action=confirmBook]'); if (button) button.disabled = true;
- try { await addTasks([t]); } catch (e) { if (button?.isConnected) button.disabled = false; throw e; }
+ lastBooking = structuredClone(pendingBooking);
+ const t = C.validateTask({...pendingBooking, fireAt: new Date(Date.now() + 200).toISOString()});
+ // 连点“确认预约”只算一次；按下就显示“正在提交”
+ const button = $('#dialog [data-action=confirmBook]'); if (button) { button.disabled = true; button.textContent = '正在提交…'; }
+ try { await addTasks([t]); } catch (e) { if (button?.isConnected) { button.disabled = false; button.textContent = '确认预约'; } throw e; }
  pendingBooking = null;
  state.bookingId = t.id;
  bookingDialog();
  updateTaskBadge();
+ // 立即预约不用等下一次定时检查（原来要多等约 1 秒）
+ setTimeout(() => { lastTick = 0; tick(); }, 220);
+}
+// 没约上时“再试一次”：同一区域、同一时段，只用现在还空着的那几个座位
+let lastBooking = null;
+async function retryBook() {
+ const b = lastBooking;
+ if (!b || !same(state.areaId, b.areaId) || state.day !== b.day) { closeDialog(); toast('请重新选座后预约'); return; }
+ for (let i = 0; i < 20 && state.reading.library; i++) await sleep(250);
+ const seats = b.seats.filter(s => state.seats.some(x => same(x.id, s.id) && x.available));
+ if (!seats.length) { closeDialog(); haptic('reject'); toast('这几个座位已经没有空的了，换一个吧'); return; }
+ pendingBooking = {...structuredClone(b), seats};
+ $('#dialog').dataset.kind = 'book';
+ await confirmBook();
 }
 function bookingDialog() {
  const t = state.tasks.find(x => x.id === state.bookingId);
@@ -743,7 +800,7 @@ function bookingDialog() {
   h = '<h2>正在预约…</h2><ol class="progress-steps">' + ['检查登录和已有预约', '提交预约', '确认结果'].map((s, i) => { const cls = i + 1 < now ? 'done' : i + 1 === now ? 'now' : ''; return '<li class="' + cls + '"><i>' + (cls === 'done' ? I.check : '') + '</i>' + s + '</li>'; }).join('') + '</ol><p class="muted small">' + esc(t.message) + '</p><div class="dialog-actions"><button class="btn text" data-action="closeDialog">在后台继续</button></div>';
  } else {
   h = '<h2>' + (ok ? '预约成功' : '没有完成预约') + '</h2>' + (ok ? seatNotifyTip() : '') + '<div class="result ' + (ok ? 'ok' : 'warn') + '">' + (ok ? I.ok : I.warn) + '<div><strong>' + (ok ? esc(t.areaName) + ' · ' + esc(t.bookedSeat?.no || '') + ' 号' : esc(STATUS[t.status] || t.status)) + '</strong><span>' + esc(t.message) + '</span></div></div><div class="dialog-actions">'
-   + (ok ? (hasPass() ? '<button class="btn text" data-action="openPass">入馆码</button>' : '') + '<button class="btn filled" data-action="closeDialog">完成</button>' : '<button class="btn text" data-action="goTasks">查看任务</button><button class="btn filled" data-action="closeDialog">知道了</button>') + '</div>';
+   + (ok ? (hasPass() ? '<button class="btn text" data-action="openPass">入馆码</button>' : '') + '<button class="btn filled" data-action="closeDialog">完成</button>' : (t.status === 'failed' && lastBooking ? '<button class="btn text" data-action="closeDialog">换个座位</button><button class="btn filled" data-action="retryBook">再试一次</button>' : (navPages().includes('tasks') ? '<button class="btn text" data-action="goTasks">查看任务</button>' : '') + '<button class="btn filled" data-action="closeDialog">知道了</button>')) + '</div>';
  }
  showDialog(h, 'booking');
 }
@@ -759,10 +816,13 @@ function onTasksChanged() {
    if (!showing) toast(t.status === 'succeeded' ? '预约成功：' + (t.bookedSeat?.no || '') + ' 号' : '预约没有完成：' + (STATUS[t.status] || t.status));
    haptic(t.status === 'succeeded' ? 'confirm' : 'reject');
    if (t.status === 'succeeded') {
+    justBooked = {no: String(t.bookedSeat?.no || ''), until: Date.now() + 20000};
     state.selection = []; syncLiveSeat(); syncReminders(); refreshAfterBooking(); maybeThanks(2800);
     // 成了就收起结果弹窗，回到页面顶部看新预约。
     if (showing) setTimeout(() => { const dd = $('#dialog'); if (dd.open && dd.dataset.kind === 'booking' && !state.bookingId) { closeDialog(); render(); window.scrollTo({top: 0, behavior: 'smooth'}); } }, 1500);
    } else if (t.status === 'uncertain') laterRefresh(3000, 12000);
+   // 没约上多半是座位被别人约走：重新读座位，被约走的从已选里去掉，还空着的留着
+   else if (t.status === 'failed') refreshAfterBooking({keep: true});
   }
  }
  if (state.page === 'tasks' || state.page === 'me') render();
@@ -783,9 +843,9 @@ function desktopNotify(title, text, page = '', force = false) {
  host('notify', {title, text, page, force}).catch(() => {});
 }
 // 预约、取消、签退之后自动刷新：等界面手头的读取做完再刷，不会因为“正在读取”被跳过。
-async function refreshAfterBooking() {
- for (let i = 0; i < 60 && state.loading; i++) await sleep(250);
- await busy(async () => { if (state.areaId && state.info) await fetchSeats(state.areaId, []); await refreshCurrent(); state.updated = nowStamp(); }, {quiet: true});
+async function refreshAfterBooking({keep = false} = {}) {
+ for (let i = 0; i < 60 && state.reading.library; i++) await sleep(250);
+ await busy(async () => { if (state.areaId && state.info) await fetchSeats(state.areaId, keep ? state.selection : []); await refreshCurrent(); state.updated = nowStamp(); }, {quiet: true});
 }
 function laterRefresh(...delays) { for (const ms of delays.length ? delays : [3000]) setTimeout(() => { if (state.libraryConnected) refreshAfterBooking(); }, ms); }
 // 提交后一时没在记录里看到的任务：之后每次读到学校记录都再核对一次，对上了就算约到。
@@ -844,7 +904,7 @@ function mergeVisits() {
  state.preferences.visitLog = {...(state.preferences.visitLog || {}), [id]: merged};
  save().catch(() => {});
 }
-async function loadRecords(quiet = false) { await busy(async () => { setRecords(await api('records')); }, {quiet}); }
+async function loadRecords(quiet = false) { await busy(async () => { setRecords(await api('records')); }, {quiet, kind: 'records'}); }
 async function cancelTask(id) {
  const t = state.tasks.find(x => x.id === id);
  if (!t || !C.active.includes(t.status)) { render(); return; }
@@ -1813,7 +1873,7 @@ async function confirmLeave() {
  closeDialog();
  const lock = async () => { leaveLockAt.set(accountId + ':' + id, Date.now()); state.preferences.uncertainLeaveIds = [...new Set([...(state.preferences.uncertainLeaveIds || []), accountId + ':' + id])]; await save(); };
  try {
-  await busy(async () => {
+  await opBusy(async () => {
    let result;
    try { result = await api('temporaryLeave', {id}, accountId); }
    catch (e) { if (e.uncertain || e.code === 'UNCERTAIN') { await lock(); laterRefresh(3000, 12000, 95000); } throw e; }
@@ -1835,15 +1895,27 @@ function checkoutDialog(id) {
  haptic('tick');
  showDialog('<h2>结束使用，释放座位？</h2>' + summary([['座位', esc((r.nameMerge || r.areaName || '图书馆') + ' · ' + (r.no || r.name || ''))], ['时间', esc(reservationSpan(r).text || '—')]]) + '<p class="muted small">座位会还给学校，之后不能再回来坐。</p><div class="dialog-actions"><button class="btn text" data-action="closeDialog">再坐会儿</button><button class="btn filled danger" data-confirm-checkout="' + esc(r.id) + '">结束使用</button></div>', 'checkout');
 }
+// 取消预约、结束使用：处理中卡片先变淡、不能重复点；学校确认后卡片先收起，再从列表里去掉，不突然消失
+function opCard(attr, id) { return $('[' + attr + '="' + CSS.escape(String(id)) + '"]')?.closest('.card.current, .record'); }
+async function collapse(el) {
+ if (!el?.animate || !motionOn()) return;
+ const h = el.getBoundingClientRect().height;
+ // 播放途中卡片被重画替换掉时，旧元素上的动画不会结束：最多等 0.3 秒
+ const a = el.animate([{opacity: 1, height: h + 'px', overflow: 'hidden'}, {opacity: 0, height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px', overflow: 'hidden'}], {duration: 240, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards'});
+ await Promise.race([a.finished.catch(() => {}), sleep(300)]);
+}
+function opWorking(...ids) { const w = state.opWorking; return !!w && ids.some(x => x != null && String(x) === w); }
 async function confirmCheckout(id) {
  if (checkingOut) return;
  checkingOut = true;
  closeDialog();
  const accountId = state.activeAccountId;
+ state.opWorking = String(id);
  try {
-  await busy(async () => {
+  await opBusy(async () => { try {
    const result = await api('checkout', {id: String(id)}, accountId);
    if (accountId !== state.activeAccountId) return;
+   if (result.verified) await collapse(opCard('data-checkout', id));
    state.current = result.current || []; state.currentError = ''; state.knownCurrent = state.current;
    // 已经离馆：这个预约的“回座提醒”不用再发。
    state.preferences.manualReminders = (state.preferences.manualReminders || []).filter(x => !String(x.id).startsWith('leave:' + id + ':'));
@@ -1852,7 +1924,7 @@ async function confirmCheckout(id) {
    haptic(result.verified ? 'confirm' : 'reject');
    toast(result.verified ? '已结束使用，座位已释放' : '已提交，正在刷新状态');
    if (!result.verified) laterRefresh(3000, 12000);
-  });
+  } finally { state.opWorking = null; } });
  } finally { checkingOut = false; }
 }
 
@@ -1868,10 +1940,12 @@ async function confirmCancelBooking(id) {
  cancelling = true;
  closeDialog();
  const accountId = state.activeAccountId, r = state.records.find(x => same(x.id, id));
+ state.opWorking = String(id);
  try {
-  await busy(async () => {
+  await opBusy(async () => { try {
    const result = await api('cancelBooking', {id: String(id)}, accountId);
    if (accountId !== state.activeAccountId) return;
+   if (result.verified) await collapse(opCard('data-cancel-booking', id));
    state.records = result.records || state.records; state.recordsLoaded = true;
    if (result.verified && r) markTaskCancelled(r);
    await refreshCurrent();
@@ -1879,7 +1953,7 @@ async function confirmCancelBooking(id) {
    haptic(result.verified ? 'confirm' : 'reject');
    toast(result.verified ? '已取消预约' : '已提交取消，正在刷新记录');
    if (!result.verified) laterRefresh(3000, 12000);
-  });
+  } finally { state.opWorking = null; } });
  } finally { cancelling = false; }
 }
 // 本机预约任务约到的就是这个座位时，标记为已取消，不再显示“已预约”和签到提醒。
@@ -1894,9 +1968,15 @@ function markTaskCancelled(r) {
 function showDialog(html, kind = '') {
  const dlg = $('#dialog'); clearTimeout(dlg.closeTimer); dlg.classList.remove('closing');
  const d = $('#dialog');
+ // 弹窗开着时换内容（确认 → 进度 → 结果）：高度平滑过渡；换成另一种弹窗时新内容再淡入，不硬切
+ const morph = d.open && motionOn(), from = morph ? d.getBoundingClientRect().height : 0, swap = morph && d.dataset.kind !== kind;
  d.dataset.kind = kind;
  d.innerHTML = '<div class="sheet" tabindex="-1" autofocus><div class="sheet-handle"></div><button class="icon-btn sheet-close" data-action="closeDialog" aria-label="关闭">' + I.close + '</button>' + html + '</div>';
- if (!d.open) d.showModal();
+ if (!d.open) { d.showModal(); return; }
+ if (!morph) return;
+ const to = d.getBoundingClientRect().height;
+ if (Math.abs(to - from) > 2) d.animate([{height: from + 'px', overflow: 'hidden'}, {height: to + 'px', overflow: 'hidden'}], {duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)'});
+ if (swap) for (const el of d.querySelectorAll('.sheet > :not(.sheet-handle):not(.sheet-close)')) el.animate([{opacity: 0, transform: 'translateY(6px)'}, {opacity: 1, transform: 'none'}], {duration: 220, delay: 40, easing: 'ease-out', fill: 'backwards'});
 }
 function closeDialog(force = false) {
  const d = $('#dialog');
@@ -1981,7 +2061,7 @@ function go(page) {
  if (animate) transition('tab', render); else render();
  // 手机上所有 WebView 共用一个渲染线程，后台登录教务、读记录会挤掉切页动画的帧：等入场动画播完（约 0.26 秒）再开始。
  const work = () => {
-  if (['tasks', 'me'].includes(state.page) && state.libraryConnected && !state.recordsLoaded && !state.loading) loadRecords(true);
+  if (['tasks', 'me'].includes(state.page) && state.libraryConnected && !state.recordsLoaded && !state.reading.records) loadRecords(true);
   if (state.page === 'me') { loadAccountStatus(); maybeThanks(); }
   if (state.page === 'rooms' && !onlineRooms()) autoConnectTeaching();
  };
@@ -2030,7 +2110,7 @@ async function action(name, arg = '') {
   case 'loginLibrary': case 'loginTeaching': closeDialog(); await host('openLogin', {system: name === 'loginTeaching' ? 'teaching' : 'library', auto: state.hasCredentials, accountId: state.activeAccountId}); break;
   case 'refresh': if (state.areaId && state.info) await loadSeats(state.areaId); else await loadLibrary(); break;
   case 'records': await loadRecords(); break;
-  case 'refreshCurrent': await busy(refreshCurrent); break;
+  case 'refreshCurrent': await busy(refreshCurrent, {kind: 'current'}); break;
   case 'officialCurrent': await host('openOfficial', {target: 'current', accountId: state.activeAccountId}); break;
   case 'seatMap': await host('openOfficial', {target: 'area', areaId: String(state.areaId), day: state.day, seatId: state.selection[0] ? String(state.selection[0].id) : '', accountId: state.activeAccountId}); break;
   case 'seatLocation': { const r = state.current.find(x => same(x.id, arg)) || state.current[0]; if (r) await host('openOfficial', {target: 'area', areaId: String(r.area_id ?? r.areaId ?? ''), day: reservationSpan(r).day || C.nowChina(), seatId: String(r.space_id ?? r.seat_id ?? r.space ?? ''), accountId: state.activeAccountId}); break; }
@@ -2045,6 +2125,7 @@ async function action(name, arg = '') {
   case 'clearPeriods': { const form = $('#roomForm'); if (form) { $$('#roomForm [name="period"]').forEach(x => x.checked = false); form.dispatchEvent(new Event('change', {bubbles: true})); } break; }
   case 'book': bookDialog(); break;
   case 'confirmBook': await confirmBook(); break;
+  case 'retryBook': await retryBook(); break;
   case 'teachingOptions': await connectTeaching(); break;
   case 'forget': {
    const d = await host('forgetCredentials', {accountId: state.activeAccountId});
@@ -2297,8 +2378,8 @@ async function pullRefresh() {
    else if (onlineRooms()) await roomTask(loadTeachingOptions);
    if (!onlineRooms() && !state.error) { toast('连不上教务，用的是本机数据'); return; }
   }
-  else if (state.page === 'tasks' || state.page === 'me') { if (state.page === 'me') await loadAccountStatus({force: true}); await busy(async () => { setRecords(await api('records')); await refreshCurrent(); }); }
-  else await busy(refreshCurrent);
+  else if (state.page === 'tasks' || state.page === 'me') { if (state.page === 'me') await loadAccountStatus({force: true}); await busy(async () => { setRecords(await api('records')); await refreshCurrent(); }, {kind: 'records'}); }
+  else await busy(refreshCurrent, {kind: 'current'});
   if (!state.error) toast('已刷新');
  } finally { pull.busy = false; el.classList.remove('spin'); endPull(); }
 }

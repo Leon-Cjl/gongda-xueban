@@ -2,7 +2,8 @@
 const DTF=new Map(),dtf=(l,o)=>{const k=l+JSON.stringify(o);let f=DTF.get(k);if(!f){f=new Intl.DateTimeFormat(l,o);DTF.set(k,f);}return f;};// 日期格式器建一次反复用（每次 new 很慢，切页时要调几十次）
 const active=['pending','checking','submitting','verifying'];
 const errorText=e=>e?.message||String(e||'未知错误');
-function nowChina(){return dtf('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+// 今天的日期一次渲染里要用几十次：同一秒内直接复用（真机切一次页要多花约 1ms）
+let nowSec=-1,nowDay='';function nowChina(){const s=Math.floor(Date.now()/1000);if(s!==nowSec){nowSec=s;nowDay=dtf('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}return nowDay;}
 // 日期要是日历上真有的一天（2 月 30 日这种格式对但不存在的拒掉），时间要是 00:00–23:59。
 function validDay(day){if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return false;const d=new Date(day+'T12:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===day;}
 function validTime(time){return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time);}
