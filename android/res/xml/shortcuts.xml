@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+ <shortcut android:shortcutId="pass" android:enabled="true" android:icon="@drawable/ic_shortcut_pass" android:shortcutShortLabel="@string/shortcut_pass" android:shortcutLongLabel="@string/shortcut_pass_long">
+  <intent android:action="cn.qlucampus.personal.PASS" android:targetPackage="cn.qlucampus.gongda" android:targetClass="cn.qlucampus.personal.MainActivity"/>
+ </shortcut>
+ <shortcut android:shortcutId="rooms" android:enabled="true" android:icon="@drawable/ic_shortcut_rooms" android:shortcutShortLabel="@string/shortcut_rooms" android:shortcutLongLabel="@string/shortcut_rooms_long">
+  <intent android:action="cn.qlucampus.personal.PAGE" android:targetPackage="cn.qlucampus.gongda" android:targetClass="cn.qlucampus.personal.MainActivity">
+   <extra android:name="page" android:value="rooms"/>
+  </intent>
+ </shortcut>
+ <shortcut android:shortcutId="tasks" android:enabled="true" android:icon="@drawable/ic_shortcut_tasks" android:shortcutShortLabel="@string/shortcut_me" android:shortcutLongLabel="@string/shortcut_me_long">
+  <intent android:action="cn.qlucampus.personal.PAGE" android:targetPackage="cn.qlucampus.gongda" android:targetClass="cn.qlucampus.personal.MainActivity">
+   <extra android:name="page" android:value="me"/>
+  </intent>
+ </shortcut>
+</shortcuts>

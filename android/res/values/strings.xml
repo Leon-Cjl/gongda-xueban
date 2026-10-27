@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+ <string name="shortcut_pass">入馆码</string>
+ <string name="shortcut_pass_long">出示图书馆入馆码</string>
+ <string name="shortcut_rooms">空教室</string>
+ <string name="shortcut_rooms_long">查询空教室</string>
+ <string name="shortcut_me">我的</string>
+ <string name="shortcut_me_long">账号状态与违约记录</string>
+ <string name="tile_pass">入馆码</string>
+</resources>

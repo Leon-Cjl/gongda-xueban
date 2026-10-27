@@ -1,0 +1,32 @@
+# 构建产物与工具
+/dist/
+/build/
+/android/build/
+/tools/jdk/
+/tools/android-platform/
+/tools/android-build/
+/tools/webview2/
+.gradle/
+local.properties
+
+# 签名、账号数据、本机会话 —— 永远不要提交
+/android/signing/
+/.debug-signing/
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pass
+*.key
+*.bin
+/data/
+/qa-data/
+.env
+.env.*
+
+# 杂项
+__pycache__/
+*.apk
+*.idsig
+.DS_Store
+Thumbs.db

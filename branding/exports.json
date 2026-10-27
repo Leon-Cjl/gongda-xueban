@@ -1,0 +1,37 @@
+{
+  "source": "built-in imagegen",
+  "version": "0.7.0",
+  "masterSize": [
+    1254,
+    1254
+  ],
+  "masterHasTransparency": true,
+  "contentBounds": [
+    155,
+    201,
+    1099,
+    1104
+  ],
+  "adaptiveLayerDP": 108,
+  "symbolMaxDP": 40,
+  "safeZoneDP": 66,
+  "densities": [
+    "mdpi",
+    "hdpi",
+    "xhdpi",
+    "xxhdpi",
+    "xxxhdpi"
+  ],
+  "icoSizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    128,
+    256
+  ],
+  "previewIsDeviceScreenshot": false
+}

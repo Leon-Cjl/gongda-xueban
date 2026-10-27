@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.qlucampus.gongda" android:versionCode="17" android:versionName="1.1.15">
+ <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35"/>
+ <uses-permission android:name="android.permission.INTERNET"/>
+ <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+ <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+ <!-- 签到提醒要按时：Android 12–12L 用 SCHEDULE_EXACT_ALARM（默认允许），13 起用 USE_EXACT_ALARM（安装即授予）。重启后重新设置提醒用 RECEIVE_BOOT_COMPLETED，设完即退出、不常驻。 -->
+ <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>
+ <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+ <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+ <application android:label="工大学伴" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+  <activity android:name="cn.qlucampus.personal.MainActivity" android:exported="true" android:launchMode="singleTask" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode" android:windowSoftInputMode="adjustResize">
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+   <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
+  </activity>
+  <service android:name="cn.qlucampus.personal.PassTileService" android:label="@string/tile_pass" android:icon="@drawable/ic_tile_pass" android:exported="true" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+   <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+   <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="false"/>
+  </service>
+  <receiver android:name="cn.qlucampus.personal.ReminderReceiver" android:exported="false"/>
+  <receiver android:name="cn.qlucampus.personal.BootReceiver" android:exported="true">
+   <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter>
+  </receiver>
+ </application>
+</manifest>

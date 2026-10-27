@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>学校控件结构回归夹具 · 模拟数据</title>
+<input type="hidden" id="xnm" value="2026"><input type="hidden" id="xqm" value="3"><input type="hidden" id="gnmkdmKey" value="N2155">
+<select id="dm_cx"><option value="2026-3" selected>2026–2027 第一学期</option><option value="2026-12">2026–2027 第二学期</option><option value="2025-3">2025–2026 第一学期</option></select>
+<select id="xqh_id"><option value="1" selected>测试校区</option></select><select id="lh"><option value="">全部教学楼</option><option value="A" selected>A 楼</option></select>
+<input type="hidden" id="cdjylx" value="normal"><table id="tabGrid"></table>
+<table id="selectTR_ZC"><tr><th class="selectTH" value="7">7</th><th class="selectTH" value="8">8</th></tr></table>
+<table id="selectTR_JC"><tr><th class="selectTH" value="1">1</th><th class="selectTH" value="2">2</th></tr></table>
+<script>
+var dqzc=7;
+window.jQuery={ajax:function(options){
+ const p=options.data;
+ if(options.url.includes('doType=query')&&p.lh==='A'&&p.xnm==='2026'&&p.xqm==='3'&&p.zcd==='64'&&p.jcd==='3'&&p.xqj==='2'&&!('jxl_id' in p)){
+  options.success({items:[{cd_id:'fixture-101',cdmc:'隔离测试教室 101',jxlmc:'A楼',xqmc:'测试校区',zws:60}],totalResult:1});
+ }else options.error({status:400},'fixture-invalid-parameters');
+}};
+</script>
