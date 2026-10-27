@@ -2,7 +2,7 @@
    学校请求一律经本机客户端转发；这里负责界面状态、预约调度与本机保存。 */
 (() => {
 'use strict';
-const VERSION = '0.9.21';
+const VERSION = '0.9.22';
 // 公开版：单账号、只有“立即预约”；有可收起的“支持作者”卡片和《用户协议与隐私说明》。
 const PUBLIC = window.CampusEdition === 'public';
 const SHOWN_VERSION = PUBLIC ? (window.CampusEditionVersion || '') : VERSION;
@@ -662,18 +662,23 @@ async function loadSeats(id, reset = false) {
   if (opening) requestAnimationFrame(() => $('.seat-card')?.scrollIntoView({block: 'start'}));
  });
 }
+// 学校数据还在读时不让换日期、区域或选座：否则日期标签变了，座位却还是上一次读到的那天。
+function libraryInputLocked() { if (!state.loading) return false; toast('数据读取完成后再切换日期或区域'); render(); return true; }
 function backToAreas() { haptic('tick'); ++libraryEpoch; state.openingArea = ''; state.info = null; state.seats = []; state.selection = []; state.areaId = ''; transition('back', () => { render(); window.scrollTo(0, 0); }); save().catch(() => {}); }
 async function changeDay(day) {
+ if (libraryInputLocked()) return;
  if (!C.validDay(day) || day === state.day) { render(); return; }
  state.day = day; state.selection = [];
  await loadLibrary();
 }
 async function changeLibrary(id) {
+ if (libraryInputLocked()) return;
  if (same(id, state.libraryId)) return;
  state.libraryId = id; state.areaId = ''; state.info = null; state.selection = [];
  await loadLibrary();
 }
 function toggleSeat(id) {
+ if (libraryInputLocked()) return;
  const seat = state.seats.find(x => same(x.id, id));
  if (!seat?.available) return;
  poppedSeat = String(seat.id); setTimeout(() => { poppedSeat = ''; }, 0);
@@ -711,7 +716,7 @@ async function refreshCurrent() {
 // 弹窗打开时记下要约的内容：确认前座位列表在后台刷新、选择被清掉，提交的仍是弹窗里看到的那一份。
 let pendingBooking = null;
 function bookDialog() {
- if (!state.info || !state.selection.length) return;
+ if (libraryInputLocked() || !state.info || !state.selection.length) return;
  const t = baseTask();
  if (state.kind === 1 && !state.segment) { toast('请先选择学校固定时段'); return; }
  pendingBooking = structuredClone(t);
@@ -1321,8 +1326,8 @@ function openRoomDay({name, exactId = '', title = '', date = '', fromForm = fals
  const q = (fromForm ? state.preferences.roomQuery : state.roomQuery || state.preferences.roomQuery) || {}, o = state.teachingOptions || {};
  state.roomDay = {name, exactId, title: title || name, week: Number(q.week) || o.currentWeek || 1, weekday: Number(q.weekday) || chinaWeekday(), token: 0};
  // 指定了日期：按今天所在的教学周推算那天是第几周、星期几
- if (date === roomFindDefault()) date = '';
- if (date && !Number(o.currentWeek)) { toast('没连上教务，只能看已保存的那一天'); return; }
+ // 没连上教务时推算不了周次：选的就是默认那天照常看已保存的数据，选了别的日期才提示
+ if (date && !Number(o.currentWeek)) { if (date !== roomFindDefault()) { toast('没连上教务，只能看已保存的那一天'); return; } date = ''; }
  if (date) {
   const delta = Math.round((Date.parse(date + 'T12:00:00+08:00') - Date.parse(C.nowChina() + 'T12:00:00+08:00')) / 86400000), wd = chinaWeekday(), week = Number(o.currentWeek) + Math.floor((wd - 1 + delta) / 7);
   if (!Number.isFinite(delta) || !(week >= 1 && week <= 53)) { toast('所选日期不在本学期查询范围'); return; }
@@ -1731,6 +1736,7 @@ async function favoriteClick(b) {
  if (f.type === 'seat') await useSeatFavorite(f); else await useRoomFavorite(f);
 }
 async function useSeatFavorite(f) {
+ if (libraryInputLocked()) return;
  state.page = 'library'; state.error = '';
  if (!state.libraryConnected) { render(); toast('请先登录图书馆'); return; }
  if (f.libraryId) state.libraryId = f.libraryId;
@@ -1964,7 +1970,7 @@ function applyAppearance() {
  const bg = (getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g) || []).map(Number);
  host('appearance', {dark, accent, bg: bg.length >= 3 && bg[3] !== 0 ? '#' + bg.slice(0, 3).map(n => Math.round(n).toString(16).padStart(2, '0')).join('') : ''}).catch(() => {});
  // 记下这次的外观，下次冷启动时 boot.js 第一帧就用上
- try { localStorage.setItem('campus.boot.v1', JSON.stringify({data: {...root.dataset}, style: root.style.cssText})); } catch (e) {}
+ try { localStorage.setItem('campus.boot.v1', JSON.stringify({data: {...root.dataset}, style: root.style.cssText, system: p.theme === 'system', dark})); } catch (e) {}
 }
 function go(page) {
  if (!PAGES[page]) return;
@@ -1986,7 +1992,7 @@ function back() {
  if (d.open && d.dataset.kind === 'consent') return false;
  if (d.open) { closeDialog(); return true; }
  // 正在打开某个区域（座位还没出来）时按返回，回到区域列表，不直接退出应用
- if (state.page === 'library' && (state.info || state.openingArea)) { backToAreas(); return true; }
+ if (state.page === 'library' && (state.info || state.openingArea || state.areaId)) { backToAreas(); return true; }
  if (state.page !== 'library') { go('library'); return true; }
  return false;
 }

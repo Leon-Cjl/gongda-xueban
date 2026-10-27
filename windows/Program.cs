@@ -18,8 +18,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Reflection.AssemblyTitle("工大学伴")]
 [assembly: System.Reflection.AssemblyProduct("工大学伴")]
 [assembly: System.Reflection.AssemblyDescription("工大学伴")]
-[assembly: System.Reflection.AssemblyVersion("0.9.21.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.9.21.0")]
+[assembly: System.Reflection.AssemblyVersion("0.9.22.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.9.22.0")]
 
 static class Program {
  [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);

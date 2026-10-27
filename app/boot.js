@@ -6,7 +6,9 @@
   var platform = window.CampusPlatform || (window.NativeHost ? 'android' : '');
   if (platform) root.dataset.platform = platform;
   var saved = JSON.parse(localStorage.getItem('campus.boot.v1') || 'null');
-  if (saved && saved.data) for (var k in saved.data) if (k !== 'platform' && k !== 'vt') root.dataset[k] = saved.data[k];
-  if (saved && typeof saved.style === 'string') root.style.cssText = saved.style;
+  // 跟随系统深浅色、而系统已经换了模式时，上次的深浅色和主题色都不能用：只恢复其他设置，颜色按样式表默认
+  var stale = saved && saved.system && matchMedia('(prefers-color-scheme: dark)').matches !== !!saved.dark;
+  if (saved && saved.data) for (var k in saved.data) if (k !== 'platform' && k !== 'vt' && !(stale && k === 'theme')) root.dataset[k] = saved.data[k];
+  if (saved && !stale && typeof saved.style === 'string') root.style.cssText = saved.style;
  } catch (e) {}
 })();
