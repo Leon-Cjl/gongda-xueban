@@ -165,7 +165,7 @@
    check(q('#content').textContent.includes('/jwglxt/xtgl/index_initMenu.html'),'teaching hint names the page the school left open');
    click('[data-action="officialTeaching"]');await sleep(20);check(window.__official?.autoReturn===true,'opening the student page from the hint asks to return automatically');
   }else{
-   check([...document.querySelectorAll('.nav [data-page]')].filter(b=>!b.hidden).length===4,'phone shows four navigation tabs including the pass');
+   {const tabs=[...document.querySelectorAll('.nav [data-page]')].filter(b=>!b.hidden).sort((x,y)=>Number(x.style.order)-Number(y.style.order)).map(b=>b.dataset.page);check(tabs.join()==='library,rooms,pass,exams,me','phone shows five tabs with the pass in the middle');}
    check(getComputedStyle(q('.nav')).position==='fixed','navigation is a bottom bar on the phone');
    check(!q('.nav [data-page="tasks"]:not([hidden])')&&!!q('.nav [data-page="me"]:not([hidden])'),'phone tabs: tasks live inside 我的');
    check(!!q('.page-head .quote .src')&&q('.page-head .quote').offsetHeight>0&&q('.page-head .quote').textContent.length<60,'library header shows one short daily line with its source');

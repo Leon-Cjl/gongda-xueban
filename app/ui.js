@@ -2,7 +2,7 @@
    学校请求一律经本机客户端转发；这里负责界面状态、预约调度与本机保存。 */
 (() => {
 'use strict';
-const VERSION = '0.9.25';
+const VERSION = '0.9.28';
 // 公开版：单账号、只有“立即预约”；有可收起的“支持作者”卡片和《用户协议与隐私说明》。
 const PUBLIC = window.CampusEdition === 'public';
 const SHOWN_VERSION = PUBLIC ? (window.CampusEditionVersion || '') : VERSION;
@@ -44,9 +44,10 @@ const I = {
  medal: svg('<circle cx="12" cy="15" r="5.5"/><path d="M7 3h3.2l2 6.6M17 3h-3.2l-2 6.6"/><path d="m12 12.6.8 1.6 1.7.2-1.3 1.2.3 1.7-1.5-.8-1.5.8.3-1.7-1.3-1.2 1.7-.2Z"/>')
 };
 const ACCENTS = [['blue', '#3482FF', '澎湃蓝'], ['teal', '#00A1B5', '青碧'], ['green', '#18A957', '翠绿'], ['purple', '#7B5CF5', '星紫'], ['orange', '#FF7A1A', '活力橙'], ['pink', '#EE4C86', '樱粉'], ['red', '#E5484D', '朱红'], ['graphite', '#5B6573', '石墨']];
-const PAGES = {library: '图书馆', rooms: '空教室', tasks: '预约任务', pass: '入馆码', me: '我的'};
+const PAGES = {library: '图书馆', rooms: '空教室', tasks: '预约任务', pass: '入馆码', exams: '考试', me: '我的'};
 // 双端分工：手机侧重查询、入馆和提醒（不常驻后台），任务并入“我的”；电脑上任务单独成页。
-const NAV = {android: ['library', 'rooms', 'pass', 'me'], windows: ['library', 'tasks', 'rooms', 'me']};
+// 手机底栏：入馆码放在正中间
+const NAV = {android: ['library', 'rooms', 'pass', 'exams', 'me'], windows: ['library', 'tasks', 'rooms', 'me']};
 const STATUS = {pending: '待执行', checking: '登录预检', submitting: '提交中', verifying: '核验中', succeeded: '已成功', failed: '未成功', uncertain: '确认中', needs_auth: '需要登录', missed: '已错过', cancelled: '已取消'};
 const TONE = {pending: 'info', checking: 'info', submitting: 'info', verifying: 'info', succeeded: 'ok', failed: 'err', uncertain: 'warn', needs_auth: 'warn', missed: 'warn'};
 const WEEKDAYS = '一二三四五六日';
@@ -85,7 +86,7 @@ const state = {
  profile: null, violations: null, statusAt: 0, statusLoading: false, statusError: '', rules: {}, reminders: [], remindersAt: 0, areaQuery: '', roomBuilding: '', roomSort: '',
  teachingAuto: {busy: false, tried: false, needsUser: false, error: ''},
  roomDay: null, roomFind: '', roomFindDate: '', calMonth: '', roomLoading: false, roomsStale: false, roomLimit: 0, libraryAuto: {busy: false, needsUser: false},
- preferences: {...(NW ? {mascotTheme: 'naiwa'} : {}), theme: 'system', motion: 'auto', accent: 'blue', seatNotify: true, roomQuery: null, seatFilter: {query: '', freeOnly: true, favoriteOnly: false}, areaFilter: {floor: '', freeOnly: false, sort: ''}, checkinLead: 15, countdown: null, manualReminders: [], firedReminders: [], desktopNotify: true}
+ preferences: {...(NW ? {mascotTheme: 'naiwa'} : {}), theme: 'system', motion: 'auto', glass: 'auto', accent: 'blue', seatNotify: true, roomQuery: null, seatFilter: {query: '', freeOnly: true, favoriteOnly: false}, areaFilter: {floor: '', freeOnly: false, sort: ''}, checkinLead: 15, countdown: null, manualReminders: [], firedReminders: [], desktopNotify: true}
 };
 // 读取标记按用途分开：读入馆记录、提交签退等不再挡住换日期和选座。state.loading 只是“有任何一种在读”，给进度条和通用判断用。
 state.reading = {library: false, current: false, records: false, op: false, account: false};
@@ -265,7 +266,7 @@ function toast(text, undo) {
 function hideToast() {
  const el = $('#toast');
  // 先淡出再隐藏；淡出途中又来了新提示就不隐藏
- if (motionOn() && !el.classList.contains('hide') && el.animate) { const text = el.innerHTML; el.animate([{opacity: 1}, {opacity: 0, transform: 'translate(-50%, 8px)'}], {duration: 160, easing: 'ease-in'}).finished.then(() => { if (el.innerHTML === text) hideToastNow(); }).catch(() => {}); return; }
+ if (motionOn() && !el.classList.contains('hide') && el.animate) { const text = el.innerHTML; el.animate([{opacity: 1}, {opacity: 0, transform: 'translate(-50%, 8px)'}], {duration: 160, easing: EASE.in}).finished.then(() => { if (el.innerHTML === text) hideToastNow(); }).catch(() => {}); return; }
  hideToastNow();
 }
 function hideToastNow() {
@@ -342,7 +343,7 @@ function motionOn() { return document.documentElement.dataset.motion !== 'off' &
 function enter(el, dx = 0, ms = 220) {
  if (!el?.animate) return;
  const slide = dx && state.platform !== 'android';
- el.animate(slide ? [{opacity: 0, transform: 'translateX(' + dx + 'px)'}, {opacity: 1, transform: 'none'}] : [{opacity: 0}, {opacity: 1}], {duration: slide ? ms + 40 : ms, easing: 'cubic-bezier(.2,.8,.2,1)'});
+ el.animate(slide ? [{opacity: 0, transform: 'translateX(' + dx + 'px)'}, {opacity: 1, transform: 'none'}] : [{opacity: 0}, {opacity: 1}], {duration: slide ? ms + 40 : ms, easing: EASE.out});
 }
 let vtSeq = 0;
 function transition(kind, fn) {
@@ -377,15 +378,17 @@ function playSwap() {
  if (!p || !motionOn()) return;
  for (const el of $$(p.sel)) enter(el, p.dx, 180);
 }
-let vtActive = false, seatsAppear = false, poppedSeat = '', panelAppear = false, formAppear = false;
+let vtActive = false, seatsAppear = false, panelAppear = false, formAppear = false;
 function render() {
  document.documentElement.dataset.platform = state.platform;
  state.page = pageFor(state.page);
  const pages = navPages();
  $$('.nav [data-page]').forEach(b => { const i = pages.indexOf(b.dataset.page); b.hidden = i < 0; b.style.order = String(i); b.setAttribute('aria-current', b.dataset.page === state.page ? 'page' : 'false'); });
+ // 滑块在换内容之前就起步：这时底栏的排版还没被新页面弄脏，读位置不费事，和新页面同一帧开始动
+ if (lastPage && lastPage !== state.page) movePill($('.nav'));
  $('#pageTitle').textContent = PAGES[state.page];
  const keep = lastPage === state.page, scroll = window.scrollY, active = document.activeElement, focusId = active?.id, caret = active?.type === 'search' ? active.selectionStart : null, stripKey = x => (x.closest('[id]')?.id || '') + '|' + x.className, strips = keep ? new Map($$('#content .chip-row.scroll').map(x => [stripKey(x), x.scrollLeft])) : new Map();
- const views = {library: libraryView, rooms: roomsView, tasks: tasksView, pass: passView, me: meView};
+ const views = {library: libraryView, rooms: roomsView, tasks: tasksView, pass: passView, exams: examsView, me: meView};
  const content = $('#content');
  content.innerHTML = errorBanner() + views[state.page]();
  if (NW && NaiwaTheme.normalize(state.preferences.mascotTheme) === 'naiwa') {
@@ -414,8 +417,132 @@ function render() {
  lastPage = state.page;
  updateDock();
  playSwap();
+ playTapMorph();
 }
-function errorBanner() { return state.error ? '<div class="banner error" role="alert"><span>' + esc(state.error) + '</span><button class="icon-btn" data-action="dismissError" aria-label="关闭提示">' + I.close + '</button></div>' : ''; }
+// 整页重画会把刚点的按钮换成新的，按钮上的颜色过渡播不出来：点之前记下它的颜色，重画后找到同一个按钮，从旧颜色过渡到新颜色并轻轻回弹
+let tapMorph = null;
+function morphKey(el) { const input = el.tagName === 'LABEL' && el.querySelector('input'); if (input) return 'LABEL|' + input.name + '=' + input.value; return el.tagName + '.' + (el.classList[0] || '') + '|' + [...el.attributes].filter(a => a.name.startsWith('data-') || a.name === 'id' || a.name === 'name' || a.name === 'value').map(a => a.name + '=' + a.value).sort().join('&'); }
+document.addEventListener('click', e => {
+ const el = e.target.closest?.('#content button, #content .chip, #content label, #dialog .seg > label');
+ // 点 label 时浏览器还会给里面的单选框补一次点击，那时它已经选中了：不能拿它覆盖第一次记下的旧位置
+ if (el && el.tagName === 'LABEL' && e.target !== el && e.target.matches('input')) return;
+ if (!el || !motionOn()) { tapMorph = null; return; }
+ // 一组里只能选一个的（分段选择、今天/明天、楼层、教学楼）：记下旧选中项的位置和样子，高亮从那里滑过来
+ const cs = getComputedStyle(el), group = slideGroup(el), was = group.filter(slideOn), one = was.length === 1 && was[0] !== el ? was[0] : null;
+ const of = one && getComputedStyle(slideFace(one));
+ // 旧位置记成相对于这一组容器的坐标：整页重画后上面的卡片高度会变、页面会挪，用屏幕坐标的话高亮会从别处飞来
+ tapMorph = {el, key: morphKey(el), at: Date.now(), top: el.getBoundingClientRect().top, prev: one ? relBox(slideFace(one), el.parentElement) : null, look: of ? {background: of.backgroundColor, borderRadius: of.borderRadius, boxShadow: of.boxShadow} : null, from: {backgroundColor: cs.backgroundColor, color: cs.color}};
+ // 下一帧再看一次：没被重画的（设置里的分段选择是原生单选框）直接滑；被局部重画换掉的（空教室结果、选座面板、弹窗）在新按钮上接着播
+ const m = tapMorph; requestAnimationFrame(() => { if (tapMorph !== m) return; if (m.el.isConnected) { tapMorph = null; slideFrom(m); } else playTapMorph(); });
+}, true);
+// 一组里只能选一个的按钮（今天/明天、楼层、设置里的分段选择等）：选中的高亮从旧选项滑到新选项，带一点回弹；能多选的不滑
+function slideGroup(el) {
+ const seg = el.closest('.seg');
+ if (seg) return [...seg.querySelectorAll(':scope > label')];
+ if (!el.parentElement || !el.classList.contains('chip')) return [];
+ return [...el.parentElement.children].filter(x => x.tagName === el.tagName && x.classList.contains('chip'));
+}
+function slideOn(x) { return x.classList.contains('on') || x.getAttribute('aria-pressed') === 'true' || !!x.querySelector?.(':scope > input:checked'); }
+function slideFace(x) { return x.matches('label') ? x.querySelector('span') || x : x; }
+function slideFrom(m, elapsed = 0) {
+ if (!m?.prev || elapsed >= LIQUID_MS - 40) return;
+ const el = m.el.isConnected ? m.el : [...$$('#content ' + m.el.tagName.toLowerCase() + ', #dialog ' + m.el.tagName.toLowerCase())].find(x => morphKey(x) === m.key);
+ if (!el || !slideOn(el)) return;
+ const group = slideGroup(el);
+ if (group.filter(slideOn).length !== 1) return;
+ const face = slideFace(el), host = el.parentElement, cs = getComputedStyle(face), seg = !!el.closest('.seg');
+ const to = relBox(face, host), from = m.prev;
+ if (!to.w || Math.abs(to.x - from.x) + Math.abs(to.y - from.y) < 2) return;
+ const ghost = document.createElement('i');
+ ghost.className = 'slide-ghost';
+ // 颜色取点击那一刻旧选中项的：新选中项身上的背景色过渡才刚开始，这时读到的还是透明
+ Object.assign(ghost.style, m.look || {background: cs.backgroundColor, borderRadius: cs.borderRadius, boxShadow: cs.boxShadow});
+ if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+ host.prepend(ghost);
+ face.style.setProperty('background-color', 'transparent'); face.style.setProperty('box-shadow', 'none');
+ // 和底栏滑块同一种动画；拉长时左右都不出这一组的容器
+ const a = ghost.animate(liquidFrames(from, to, 0, seg ? host.clientWidth : host.scrollWidth), {duration: LIQUID_MS, easing: 'linear', fill: 'forwards'});
+ if (elapsed) a.currentTime = elapsed;
+ liveSlide = {m, ghost, start: performance.now() - elapsed};
+ // 各自有底色的标签：高亮要从中间标签底下穿过，路过的标签底色临时淡掉、让它过去再恢复；原来选中的那个底色从透明慢慢回来
+ if (!seg) {
+  // 文字选中色跟着高亮一起到，不先亮
+  if (m.from?.color && m.from.color !== cs.color) face.animate([{color: m.from.color}, {color: cs.color}], {duration: LIQUID_MS * .6, easing: 'ease-out'});
+  const lo = Math.min(from.x, to.x), hi = Math.max(from.x + from.w, to.x + to.w);
+  for (const c of group) {
+   if (c === el) continue;
+   const r = relBox(c, host), bg = getComputedStyle(c).backgroundColor;
+   if (r.x + r.w <= lo || r.x >= hi) continue;
+   const source = Math.abs(r.x - from.x) < 2;
+   c.animate(source ? [{backgroundColor: 'transparent'}, {backgroundColor: 'transparent', offset: .3}, {backgroundColor: bg}] : [{backgroundColor: bg}, {backgroundColor: 'transparent', offset: .15}, {backgroundColor: 'transparent', offset: .55}, {backgroundColor: bg}], {duration: LIQUID_MS, easing: 'ease-out'});
+  }
+ }
+ face.style.setProperty('transition', 'none');
+ // 收尾时按钮自己的底色直接出现，不再从透明过渡一遍（否则影子一撤会闪一下）
+ const done = () => { if (!ghost.isConnected) return; ghost.remove(); face.style.removeProperty('background-color'); face.style.removeProperty('box-shadow'); face.offsetWidth; face.style.removeProperty('transition'); };
+ a.finished.then(done, done); setTimeout(done, LIQUID_MS + 200);
+}
+// 滑到一半页面又被重画（例如签到提醒：先在原控件上开滑，保存完设置再整页重画），影子会跟着旧控件一起被换掉：
+// 每次重画后检查一遍，在新控件上从同一进度接着滑，不会半路消失或从别处飞来
+let liveSlide = null;
+// 元素在容器内容里的位置（含容器自身的横向滚动），影子就画在这个坐标系里
+function relBox(x, host) { const r = x.getBoundingClientRect(), h = host.getBoundingClientRect(); return {x: r.left - h.left + host.scrollLeft - host.clientLeft, y: r.top - h.top + host.scrollTop - host.clientTop, w: r.width, h: r.height}; }
+function resumeSlide() {
+ const s = liveSlide;
+ if (!s || s.ghost.isConnected) return;
+ liveSlide = null;
+ slideFrom(s.m, performance.now() - s.start);
+}
+function playTapMorph() {
+ resumeSlide();
+ const m = tapMorph;
+ if (!m || Date.now() - m.at > 1500 || !motionOn()) return;
+ if (m.el.isConnected) return; // 没被重画替换：按下回弹已经在原按钮上播了
+ const tag = m.el.tagName.toLowerCase(), el = [...$$('#content ' + tag + ', #dialog ' + tag)].find(x => morphKey(x) === m.key);
+ tapMorph = null;
+ if (!el?.animate) return;
+ keepInPlace(el, m.top);
+ if (m.prev && slideOn(el) && slideGroup(el).filter(slideOn).length === 1) { slideFrom(m); pressRelease(el, m.at); return; }
+ const fade = (x, from) => { const s = getComputedStyle(x), to = {backgroundColor: s.backgroundColor, color: s.color}; if (Object.keys(to).some(k => to[k] !== from[k])) x.animate([from, to], {duration: 240, easing: 'ease-out'}); };
+ fade(el, m.from);
+ pressRelease(el, m.at);
+}
+// 重画后刚点的按钮在屏幕上挪了位置（例如筛选后列表变短，页面不够长，浏览器只能把滚动位置往回夹）：
+// 不让整页一下跳过去，从原来的位置平滑滑到新位置
+function keepInPlace(el, top) {
+ if (top == null || el.closest('dialog, .lib-side, .nav')) return;
+ const dy = top - el.getBoundingClientRect().top;
+ if (Math.abs(dy) > 2) $('#content').animate([{transform: 'translateY(' + dy + 'px)'}, {transform: 'none'}], {duration: Math.min(420, 240 + Math.abs(dy) / 3), easing: EASE.out});
+}
+// 按下反馈：安卓 WebView 的 :active 要等系统确认不是滑动才加上，快点一下几乎看不到。
+// 改成手指一碰就缩小，松手时按弹簧弹回；点完整页重画换掉了按钮，就在新按钮上接着播完剩下的回弹
+const PRESSABLE = '.btn, .chip, .seat, .icon-btn, .area-row, .room-main, .achv, .sel-chip, .account-chip, .seg > label, .swatch, .switch-row, .nav button';
+let pressed = null, releasedAt = 0;
+function pressRelease(el, at = releasedAt) {
+ if (!el?.animate || !motionOn() || el.closest('.nav') && el.closest('.nav').classList.contains('dragging')) return;
+ const face = el.matches('.seg > label, .swatch') ? el.querySelector('span') || el : el;
+ const a = face.animate([{transform: 'scale(.94)'}, {transform: 'none'}], {duration: 360, easing: SPRING.press});
+ a.currentTime = Math.min(340, Math.max(0, Date.now() - (at || Date.now())));
+}
+document.addEventListener('pointerdown', e => {
+ if (e.button > 0 || !motionOn()) return;
+ const el = e.target.closest?.(PRESSABLE);
+ if (!el || el.disabled || el.matches(':disabled')) return;
+ pressed = el; el.classList.add('pressing');
+}, {passive: true});
+function endPress(cancel) {
+ const el = pressed; pressed = null;
+ if (!el) return;
+ el.classList.remove('pressing');
+ releasedAt = Date.now();
+ if (!cancel) pressRelease(el);
+}
+document.addEventListener('pointerup', () => endPress(false), {passive: true});
+document.addEventListener('pointercancel', () => endPress(true), {passive: true});
+// 第一次出现的卡片、提示：升起淡入一次；之后页面再重画不重复播
+const shownOnce = new Set();
+function firstShow(key) { if (shownOnce.has(key)) return ''; shownOnce.add(key); return ' first-show'; }
+function errorBanner() { return state.error ? '<div class="banner error' + firstShow('error:' + state.error) + '" role="alert"><span>' + esc(state.error) + '</span><button class="icon-btn" data-action="dismissError" aria-label="关闭提示">' + I.close + '</button></div>' : ''; }
 // 只对学校明确的异常状态（注销、挂失、临时禁止）提示，读不懂的状态码不报警。
 function restricted() { return !!(state.libraryConnected && ['0', '2', '3'].includes(state.profile?.status)); }
 function updateAccountChip() {
@@ -431,11 +558,53 @@ function updateTaskBadge() {
  const target = navPages().includes('tasks') ? 'tasks' : 'me';
  $$('.nav-badge').forEach(el => { const on = el.dataset.for === target && n > 0; el.hidden = !on; el.textContent = on ? text : ''; });
 }
-let dockNav = -1, dockAll = -1;
+let dockNav = -1, dockAll = -1, pillAt = '';
+// 弹簧：w 越大越快，z 越小回弹越明显。cubic-bezier 的“回弹”是前 1/4 时间冲完、剩下慢慢挪，看着像一下跳过去；
+// 这里按真实弹簧算出位移曲线，写成 CSS linear() 缓动（安卓 WebView 113 起支持，旧的退回普通缓出）
+function springAt(t, w, z) { const wd = w * Math.sqrt(1 - z * z); return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + z * w / wd * Math.sin(wd * t)); }
+const LINEAR_OK = (() => { try { return CSS.supports('transition-timing-function', 'linear(0, 1)'); } catch (e) { return false; } })();
+function spring(w, z, ms) { if (!LINEAR_OK) return 'cubic-bezier(.2,.9,.3,1)'; const n = 40, pts = []; for (let i = 0; i <= n; i++) pts.push(+springAt(i / n * ms / 1000, w, z).toFixed(4)); pts[n] = 1; return 'linear(' + pts.join(',') + ')'; }
+// 全部动画只用这几条曲线：进场缓出、退场缓入、弹簧（样式表里的 --spring 也由这里算好写进去）
+const EASE = {out: 'cubic-bezier(.2,.8,.2,1)', in: 'cubic-bezier(.4,0,1,1)'};
+const SPRING = {press: spring(34, .62, 360), sheet: spring(26, .78, 360)};
+if (LINEAR_OK) document.documentElement.style.setProperty('--spring', SPRING.sheet);
+// 悬浮底栏里选中项下面那块浅色滑块：前沿快、后沿慢，滑动时被拉长再收回，像一滴水滑过去（第一次只放到位，不播动画）
+function movePill(navEl) {
+ const cur = navEl?.querySelector('button[aria-current=page]');
+ if (!cur || getComputedStyle(navEl).position !== 'fixed') return;
+ let pill = navEl.querySelector('.nav-pill');
+ if (!pill) { pill = document.createElement('i'); pill.className = 'nav-pill'; pill.setAttribute('aria-hidden', 'true'); navEl.prepend(pill); } pill.classList.toggle('on-pass', cur.dataset.page === 'pass');
+ const x = cur.offsetLeft, w = cur.offsetWidth, at = x + ',' + w;
+ if (at === pillAt) return;
+ const prev = pillAt.split(',').map(Number); pillAt = at;
+ pill.getAnimations().forEach(a => a.cancel());
+ pill.style.width = w + 'px'; pill.style.transform = 'translateX(' + x + 'px)';
+ if (prev.length !== 2 || !pill.classList.contains('ready') || !motionOn() || navEl.classList.contains('dragging')) { pill.classList.add('ready'); return; }
+ // 回弹不能冲出底栏：左右沿限制在第一个、最后一个按钮的外沿以内，冲到边上时滑块被压扁一点再弹回
+ const [px, pw] = prev, btns = [...navEl.querySelectorAll('button[data-page]')].filter(b => b.offsetWidth > 0), h = pill.offsetHeight;
+ const frames = liquidFrames({x: px, y: 0, w: pw, h}, {x, y: 0, w, h}, Math.min(...btns.map(b => b.offsetLeft)), Math.max(...btns.map(b => b.offsetLeft + b.offsetWidth)));
+ pill.animate(frames, {duration: LIQUID_MS, easing: 'linear'});
+}
+// 底栏滑块和各处选中高亮共用的位移：整块滑过去，只在跑得最快时顺着方向略微拉长（最多 20%），到位时带一点点回弹；左右沿不超出 [minL, maxR]
+// （之前前后沿分开走，中途被拉成横跨两格的一大坨，收尾又慢慢挪 300ms，真机录屏看着发糊）
+const LIQUID_MS = 360;
+function liquidFrames(from, to, minL = -Infinity, maxR = Infinity) {
+ const frames = [], n = 24, px = v => v.toFixed(1) + 'px', s = t => springAt(t, 32, .78), dt = .004;
+ let vmax = 0; const v = []; for (let i = 0; i <= n; i++) { const t = i / n * LIQUID_MS / 1000, d = (s(t + dt) - s(t)) / dt; v.push(d); vmax = Math.max(vmax, d); }
+ for (let i = 0; i <= n; i++) {
+  const t = i / n * LIQUID_MS / 1000, k = s(t), w = from.w + (to.w - from.w) * k, c = from.x + from.w / 2 + (to.x + to.w / 2 - from.x - from.w / 2) * k;
+  const sw = w * (1 + .2 * Math.max(0, v[i]) / (vmax || 1)), l = Math.max(minL, c - sw / 2), r = Math.min(maxR, c + sw / 2);
+  frames.push({transform: 'translate(' + px(l) + ',' + px(from.y + (to.y - from.y) * k) + ')', width: px(Math.max(8, r - l)), height: px(from.h + (to.h - from.h) * k)});
+ }
+ frames[n] = {transform: 'translate(' + to.x + 'px,' + to.y + 'px)', width: to.w + 'px', height: to.h + 'px'};
+ return frames;
+}
 function updateDock() {
  requestAnimationFrame(() => {
-  const height = el => { if (!el) return 0; const s = getComputedStyle(el); return s.position === 'fixed' && s.display !== 'none' ? el.offsetHeight : 0; };
-  const nav = height($('.nav')), side = height($('.lib-side'));
+  // 底栏、已选面板现在是悬浮的：按它们顶边到屏幕底的距离算，内容底部留白和提示条位置都跟着它
+  const height = el => { if (!el) return 0; const s = getComputedStyle(el); return s.position === 'fixed' && s.display !== 'none' ? Math.max(0, Math.round(innerHeight - el.getBoundingClientRect().top)) : 0; };
+  const navEl = $('.nav'), nav = height(navEl), side = Math.max(0, height($('.lib-side')) - nav);
+  movePill(navEl);
   // 高度没变就不写：每次重画后都写一遍会让整页样式再算一次
   if (nav !== dockNav) { dockNav = nav; document.documentElement.style.setProperty('--nav-h', nav + 'px'); }
   if (nav + side !== dockAll) { dockAll = nav + side; document.documentElement.style.setProperty('--dock-h', dockAll + 'px'); }
@@ -474,7 +643,7 @@ function currentCards() {
   const status = locked ? '暂离确认中' : r.statusMsg || r.status_name || ('学校状态 ' + (r.status ?? '—'));
   const canLeave = r.canTemporaryLeave && !away && !locked, rec = C.matchRecord(state.records, r), canCancel = C.cancellableRecord(rec) && !away && !locked;
   const fresh = takeJustBooked(no);
-  return '<section class="card current' + (fresh ? ' just-booked' : '') + (opWorking(r.id, rec?.id) ? ' working' : '') + '"' + (opWorking(r.id, rec?.id) ? ' aria-busy="true"' : '') + '><div class="current-top"><span class="overline">当前预约</span><span class="badge ' + (away || locked ? 'warn' : 'ok') + '">' + esc(status) + '</span><button class="icon-btn" data-action="refreshCurrent" aria-label="刷新当前预约">' + I.refresh + '</button></div>'
+  return '<section class="card current' + (fresh ? ' just-booked' : firstShow('cur:' + r.id)) + (opWorking(r.id, rec?.id) ? ' working' : '') + '"' + (opWorking(r.id, rec?.id) ? ' aria-busy="true"' : '') + '><div class="current-top"><span class="overline">当前预约</span><span class="badge ' + (away || locked ? 'warn' : 'ok') + '">' + esc(status) + '</span><button class="icon-btn" data-action="refreshCurrent" aria-label="刷新当前预约">' + I.refresh + '</button></div>'
    + '<h2>' + esc(r.nameMerge || r.areaName || '图书馆') + ' <span class="seat-no">' + esc(no) + (/^[A-Za-z]?\d+$/.test(no) ? ' 号' : '') + '</span></h2>'
    + (reservationSpan(r).text ? '<p class="muted small">' + esc(reservationSpan(r).text) + '</p>' : '')
    + (away ? '<p class="muted small">已暂离，请按学校规定时限回座签到</p>' : '')
@@ -486,7 +655,7 @@ function currentCards() {
 function upcomingCards() {
  const list = C.upcomingBookings(state.records, state.current).slice(0, 4);
  if (!list.length) return '';
- return '<section class="card list-card upcoming"><div class="list-head"><h2>待使用的预约</h2><span class="muted small">学校记录</span></div>' + list.map(r => '<div class="record' + (takeJustBooked(r.no ?? r.name ?? '') ? ' just-booked' : '') + (opWorking(r.id) ? ' working' : '') + '"><div><strong>' + esc((r.nameMerge || r.areaName || '图书馆') + ' ' + String(r.no ?? r.name ?? '')) + '</strong><span class="muted">' + esc(bookingTime(r)) + '</span></div><button class="btn tonal sm" data-cancel-booking="' + esc(r.id) + '">取消预约</button></div>').join('') + '</section>';
+ return '<section class="card list-card upcoming"><div class="list-head"><h2>待使用的预约</h2><span class="muted small">学校记录</span></div>' + list.map(r => '<div class="record' + (takeJustBooked(r.no ?? r.name ?? '') ? ' just-booked' : firstShow('up:' + r.id)) + (opWorking(r.id) ? ' working' : '') + '"><div><strong>' + esc((r.nameMerge || r.areaName || '图书馆') + ' ' + String(r.no ?? r.name ?? '')) + '</strong><span class="muted">' + esc(bookingTime(r)) + '</span></div><button class="btn tonal sm" data-cancel-booking="' + esc(r.id) + '">取消预约</button></div>').join('') + '</section>';
 }
 function bookingTime(r) { const t = C.reservationTimes(r); return t ? dayName(t.begin.day) + ' ' + t.begin.time + '–' + t.end.time : String(r.beginTime || ''); }
 function seatNotifyTip() {
@@ -623,7 +792,7 @@ function seatCard() {
 }
 function seatButton(s) {
  const i = state.selection.findIndex(x => same(x.id, s.id)), fav = isFavorite('seat', seatItem(s));
- return '<button class="seat' + (i >= 0 ? ' sel' : '') + (i >= 0 && same(s.id, poppedSeat) ? ' pop' : '') + (fav ? ' fav' : '') + '" data-seat="' + esc(s.id) + '"' + (s.available ? '' : ' disabled') + ' aria-pressed="' + (i >= 0) + '" aria-label="' + esc(s.no) + ' 号座位，' + (s.available ? '可预约' : '不可预约') + (fav ? '，已收藏' : '') + '">' + esc(s.no) + (i >= 0 ? '<i class="order">' + (i + 1) + '</i>' : '') + '</button>';
+ return '<button class="seat' + (i >= 0 ? ' sel' : '') + (fav ? ' fav' : '') + '" data-seat="' + esc(s.id) + '"' + (s.available ? '' : ' disabled') + ' aria-pressed="' + (i >= 0) + '" aria-label="' + esc(s.no) + ' 号座位，' + (s.available ? '可预约' : '不可预约') + (fav ? '，已收藏' : '') + '">' + esc(s.no) + (i >= 0 ? '<i class="order">' + (i + 1) + '</i>' : '') + '</button>';
 }
 function selectionPanel() {
  const sel = state.selection, n = sel.length, allFav = n > 0 && sel.every(s => isFavorite('seat', seatItem(s)));
@@ -694,7 +863,7 @@ async function changeLibrary(id) {
  await loadLibrary();
 }
 // 选座、取消选座只改动到的座位按钮和已选面板，不整页重画；页面结构对不上时退回整页重画
-function patchSeats(ids) {
+function patchSeats(ids, wasSelected = new Set()) {
  const side = $('.lib-side'), grid = $('#seatGrid');
  if (state.page !== 'library' || !side || !grid || $('#dialog').open) return false;
  for (const id of ids) {
@@ -702,6 +871,8 @@ function patchSeats(ids) {
   if (el && s) el.outerHTML = seatButton(s);
  }
  side.innerHTML = selectionPanel();
+ if (motionOn()) for (const id of ids) if (state.selection.some(x => same(x.id, id)) && !wasSelected.has(String(id))) side.querySelector('.sel-chip[data-seat="' + CSS.escape(String(id)) + '"]')?.animate([{transform: 'scale(.6)', opacity: 0}, {transform: 'none', opacity: 1}], {duration: 360, easing: SPRING.sheet});
+ playTapMorph();
  updateDock();
  return true;
 }
@@ -709,8 +880,7 @@ function toggleSeat(id) {
  if (libraryInputLocked()) return;
  const seat = state.seats.find(x => same(x.id, id));
  if (!seat?.available) return;
- const touched = new Set([...state.selection.map(x => String(x.id)), String(seat.id)]);
- poppedSeat = String(seat.id); setTimeout(() => { poppedSeat = ''; }, 0);
+ const before = new Set(state.selection.map(x => String(x.id))), touched = new Set([...before, String(seat.id)]);
  const wasEmpty = !state.selection.length;
  const i = state.selection.findIndex(x => same(x.id, seat.id));
  if (i >= 0) state.selection.splice(i, 1);
@@ -720,8 +890,8 @@ function toggleSeat(id) {
  panelAppear = wasEmpty && state.selection.length > 0;
  for (const x of state.selection) touched.add(String(x.id));
  const panel = !state.selection.length && motionOn() && $('.sel-panel:not(.empty)');
- if (panel?.animate) { panel.querySelectorAll('.sel-chip').forEach(c => c.remove()); panel.animate([{transform: 'none', opacity: 1}, {transform: 'translateY(100%)', opacity: .4}], {duration: 170, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards'}); const seatEl = $('.seat[data-seat="' + CSS.escape(String(seat.id)) + '"]'); seatEl?.classList.remove('sel'); seatEl?.querySelector('.order')?.remove(); seatEl?.setAttribute('aria-pressed', 'false'); setTimeout(() => { if (!state.selection.length && !patchSeats(touched)) render(); }, 170); return; }
- if (!patchSeats(touched)) render();
+ if (panel?.animate) { panel.querySelectorAll('.sel-chip').forEach(c => c.remove()); panel.animate([{transform: 'none', opacity: 1}, {transform: 'translateY(100%)', opacity: .4}], {duration: 170, easing: EASE.in, fill: 'forwards'}); const seatEl = $('.seat[data-seat="' + CSS.escape(String(seat.id)) + '"]'); seatEl?.classList.remove('sel'); seatEl?.querySelector('.order')?.remove(); seatEl?.setAttribute('aria-pressed', 'false'); setTimeout(() => { if (!state.selection.length && !patchSeats(touched, before)) render(); }, 170); return; }
+ if (!patchSeats(touched, before)) render();
  panelAppear = false;
 }
 function baseTask() { return {accountId: state.activeAccountId, accountName: account().label, areaId: state.areaId, areaName: state.info?.name || '', day: state.day, start: state.start, end: state.end, kind: state.kind, segment: state.segment, seats: state.selection.map(x => ({id: x.id, no: x.no}))}; }
@@ -1162,7 +1332,7 @@ function renderRoomResults() {
  if (!state.rooms) { el.remove(); return; }
  el.outerHTML = roomResults();
  if (strip) { const f = $('#roomResults .room-filter'); if (f) f.scrollLeft = strip; }
- playSwap();
+ playSwap(); playTapMorph();
 }
 function roomResults() {
  const r = state.rooms, q = state.roomQuery || {}, buildings = [...new Set(r.rooms.map(x => x.building).filter(Boolean))];
@@ -1540,6 +1710,88 @@ function askConsent() {
  });
 }
 function legalDialog() { showDialog('<h2>用户协议与隐私说明</h2><div class="legal">' + legalHtml() + '<p class="muted small">版本 ' + esc(LEGAL.version) + ' · ' + esc(LEGAL.date || '') + (state.preferences.consentAt ? ' · 你于 ' + esc(state.preferences.consentAt) + ' 同意' : '') + '</p></div><div class="dialog-actions"><button class="btn text danger" data-action="withdrawConsent">撤回同意并清除本机数据</button><button class="btn filled" data-action="closeDialog">好</button></div>', 'legal'); }
+/* ---------- 考试安排 ---------- */
+// 学生教务的“学生考试信息查询”（只读）。结果按学期存在本机，下次打开先显示上次查到的；考试时间、地点以学校教务系统公布为准。
+const EXAM_FIELDS = [['ksmc', '考试名称'], ['kssj', '考试时间'], ['cdxqmc', '考场校区'], ['cdmc', '考场'], ['zwh', '座位号'], ['cdbh', '考场编号'], ['cdjc', '考场简称'], ['ksfs', '考试方式'], ['khfs', '考核方式'], ['kch', '课程号'], ['xf', '学分'], ['kkxy', '开课学院'], ['jsxx', '任课教师'], ['jxbmc', '教学班'], ['jxbzc', '教学班组成'], ['sksj', '上课时间'], ['jxdd', '上课地点'], ['xnmc', '学年'], ['xqmmc', '学期'], ['xqmc', '校区'], ['cxbj', '是否重修'], ['zxbj', '是否自修'], ['sjbh', '考试批次']];
+const EXAM_HIDE = new Set(['kcmc', 'cdjc']);
+let examBusy = false;
+// 当前学期：教务查询页里选中的学年学期；没有时按日期推（8 月起是第一学期）。prev：上一学期。
+function examTerm(prev = false) {
+ const o = state.teachingOptions, pick = list => (list || []).find(x => x.selected)?.value;
+ let year = Number(pick(o?.xnm)), term = String(pick(o?.xqm) || '');
+ if (!year || !['3', '12'].includes(term)) { const [y, m] = C.nowChina().split('-').map(Number); year = m >= 8 ? y : y - 1; term = m >= 8 || m < 2 ? '3' : '12'; }
+ if (prev) { if (term === '3') { year -= 1; term = '12'; } else term = '3'; }
+ return {year: String(year), term};
+}
+function examTermLabel(t) { return t.year + '–' + (Number(t.year) + 1) + ' 第' + (t.term === '3' ? '一' : '二') + '学期'; }
+function examInfo(x) {
+ const m = String(x.kssj || '').match(/(\d{4}-\d{2}-\d{2})\s*\(?\s*(\d{1,2}:\d{2})\s*[-–~至]\s*(\d{1,2}:\d{2})/), day = m?.[1] || '', pad = t => t.padStart(5, '0');
+ const start = m ? pad(m[2]) : '', end = m ? pad(m[3]) : '', now = C.nowChina(), clock = dtf('en-GB', {timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false}).format(new Date());
+ const past = day ? day < now || day === now && end && end <= clock : false;
+ const place = [x.cdxqmc, x.cdmc].filter(Boolean).join(' · ') + (x.zwh ? ' · 座位 ' + x.zwh : '');
+ return {x, key: (x.kch || x.kcmc || '') + '|' + (x.kssj || ''), name: x.kcmc || x.ksmc || '考试', day, start, end, past, place: place || '考场待公布', when: day ? md(day) + ' ' + dtf('zh-CN', {timeZone: 'Asia/Shanghai', weekday: 'short'}).format(new Date(day + 'T12:00:00+08:00')) + (start ? ' ' + start + '–' + end : '') : (x.kssj || '时间待公布')};
+}
+function examList(c) { return (c?.exams || []).map(examInfo).sort((a, b) => (a.day || '9999') + a.start < (b.day || '9999') + b.start ? -1 : 1); }
+function examCountdown(e) { if (e.past) return '已结束'; const n = e.day ? C.daysUntil(e.day) : null; return n == null ? '' : n === 0 ? '今天' : n === 1 ? '明天' : n + ' 天后'; }
+function examRow(e) {
+ const soon = !e.past && e.day && C.daysUntil(e.day) <= 3;
+ return '<button class="exam-row' + (e.past ? ' past' : '') + '" data-exam="' + esc(e.key) + '"><span class="exam-date"><b>' + esc(e.day ? md(e.day) : '待定') + '</b><small>' + esc(examCountdown(e)) + '</small></span>'
+  + '<span class="exam-main"><strong>' + esc(e.name) + '</strong><span class="exam-line">' + I.calendar + esc(e.when.replace(/^\S+\s/, '') || e.when) + (soon ? '<i class="badge warn">' + esc(examCountdown(e)) + '</i>' : '') + '</span><span class="exam-line">' + I.map + esc(e.place) + '</span></span>' + I.chevron + '</button>';
+}
+function examNote() { return '<p class="exam-note muted small">' + I.warn + '<span>考试时间、地点以学校教务系统公布为准，临近考试请再核对一次。<button class="link" data-action="officialExams">打开教务考试信息</button></span></p>'; }
+function examsView() {
+ const t = examTerm(state.examPrev), c = state.preferences.examCache?.[t.year + '-' + t.term], list = examList(c), coming = list.filter(e => !e.past), done = list.length - coming.length;
+ const chips = '<div class="chip-row">' + [['now', '本学期'], ['prev', '上学期']].map(([v, l]) => '<button class="chip' + ((v === 'prev') === !!state.examPrev ? ' on' : '') + '" data-exam-term="' + v + '">' + l + '</button>').join('') + '</div>';
+ let body;
+ if (state.examError === 'needsLogin') body = '<div class="banner warn"><span>要先登录学生教务才能查考试安排</span><button class="btn text" data-action="showTeachingLogin">登录教务</button></div>';
+ else if (state.examError) body = '<div class="banner warn"><span>' + esc(state.examError) + '</span><button class="btn text" data-action="loadExams">重试</button></div>';
+ else body = '';
+ if (!c) body += examBusy ? '<div class="skel-row"><i class="skel w60"></i><i class="skel w40"></i></div><div class="skel-row"><i class="skel w60"></i><i class="skel w40"></i></div>' : '<p class="muted small">从学生教务读取' + esc(examTermLabel(t)) + '的考试科目、时间和考场。</p><button class="btn tonal" data-action="loadExams">' + I.calendar + '查询考试安排</button>';
+ else if (!list.length) body += '<div class="empty small"><p>' + esc(examTermLabel(t)) + '暂时没有考试安排</p><span class="muted small">学校一般在考试前几周公布，可以过些天再刷新</span></div>';
+ else body += (coming.length ? '<h3 class="exam-group">即将考试 · ' + coming.length + '</h3><div class="exam-list">' + coming.map(examRow).join('') + '</div>' : '<p class="muted small">这学期的考试都考完了。</p>') + (done ? '<h3 class="exam-group">已结束 · ' + done + '</h3><div class="exam-list">' + list.filter(e => e.past).map(examRow).join('') + '</div>' : '');
+ const cal = state.platform === 'android' && coming.some(e => e.day && e.start) ? '<button class="btn tonal" data-action="calendarExams">' + I.calendar + '导入日历（' + coming.filter(e => e.day && e.start).length + ' 场）</button>' : '';
+ return pageHead('考试安排', c ? esc(examTermLabel(t)) + ' · ' + esc(cacheTime(c.at)) + ' 查询' : esc(examTermLabel(t)), '<button class="icon-btn" data-action="loadExams" aria-label="刷新考试安排"' + (examBusy ? ' aria-busy="true" disabled' : '') + '>' + I.refresh + '</button>')
+  + '<section class="card exams-card">' + chips + body + (cal ? '<div class="exam-actions">' + cal + '</div>' : '') + (c ? '<p class="muted small exam-at">' + esc(examTermLabel(t)) + ' · ' + esc(cacheTime(c.at)) + ' 从教务查询</p>' : '') + examNote() + '</section>';
+}
+function allExamsDialog() {
+ const t = examTerm(state.examPrev), list = examList(state.preferences.examCache?.[t.year + '-' + t.term]);
+ showDialog('<h2>' + esc(examTermLabel(t)) + ' 考试安排</h2><div class="exam-list">' + list.map(examRow).join('') + '</div>' + examNote() + '<div class="dialog-actions"><button class="btn filled" data-action="closeDialog">好</button></div>', 'exams');
+}
+function examDialog(key) {
+ const t = examTerm(state.examPrev), e = examList(state.preferences.examCache?.[t.year + '-' + t.term]).find(x => x.key === key);
+ if (!e) return;
+ const known = new Set(EXAM_FIELDS.map(([k]) => k)), rows = EXAM_FIELDS.filter(([k]) => e.x[k] && !EXAM_HIDE.has(k)).map(([k, l]) => [l, k === 'jsxx' ? String(e.x[k]).replace(/\b\d+\//g, '') : k === 'jxdd' ? [...new Set(String(e.x[k]).split(';'))].join('；') : e.x[k]]);
+ // 学校以后多给的字段也照样列出来，不漏信息
+ for (const [k, v] of Object.entries(e.x)) if (!known.has(k) && !EXAM_HIDE.has(k) && k !== 'kcmc') rows.push([k, v]);
+ showDialog('<h2>' + esc(e.name) + '</h2>' + summary([['时间', esc(e.when) + (examCountdown(e) ? ' <span class="badge' + (e.past ? '' : ' ok') + '">' + esc(examCountdown(e)) + '</span>' : '')], ['地点', esc(e.place)]])
+  + '<div class="card list-card exam-detail">' + rows.map(([l, v]) => '<div class="record"><div><span class="muted">' + esc(l) + '</span><strong>' + esc(v) + '</strong></div></div>').join('') + '</div>' + examNote()
+  + '<div class="dialog-actions"><button class="btn text" data-action="officialExams">去教务核对</button><button class="btn filled" data-action="closeDialog">好</button></div>', 'exam');
+}
+// 把还没考的考试写进手机日历（考前一天、一小时提醒）；同一场再导入时更新原来那条
+async function calendarExams() {
+ const t = examTerm(state.examPrev), list = examList(state.preferences.examCache?.[t.year + '-' + t.term]).filter(e => !e.past && e.day && e.start);
+ if (!list.length) { toast('没有可以导入的考试'); return; }
+ const at = (day, time) => Date.parse(day + 'T' + time + ':00+08:00');
+ const events = list.map(e => ({key: (t.year + '-' + t.term + '|' + e.key), title: e.name + ' 考试', start: at(e.day, e.start), end: at(e.day, e.end || e.start), location: e.place, description: [e.x.ksmc, e.x.ksfs && '考试方式：' + e.x.ksfs, e.x.zwh && '座位号：' + e.x.zwh, e.x.kch && '课程号：' + e.x.kch, '考试时间、地点以学校教务系统公布为准。'].filter(Boolean).join('\n')}));
+ try {
+  const r = await host('calendarExams', {events});
+  haptic('confirm');
+  toast('已导入日历' + (r.calendar ? '「' + r.calendar + '」' : '') + '：新增 ' + r.added + ' 场' + (r.updated ? '，更新 ' + r.updated + ' 场' : '') + '，考前一天和一小时提醒');
+ } catch (e) { haptic('reject'); toast(C.errorText(e)); }
+}
+async function loadExams({quiet = false} = {}) {
+ if (examBusy) return;
+ examBusy = true; state.examError = ''; if (!quiet) render();
+ const t = examTerm(state.examPrev);
+ try {
+  if (!onlineRooms() && !(await backgroundTeaching({manual: true}))) throw Object.assign(Error(state.teachingAuto.needsUser ? '' : '连不上学生教务（可能不在校园网或教务在维护），稍后再试'), {code: state.teachingAuto.needsUser ? 'AUTH' : 'NETWORK'});
+  const r = await onlineTeaching('exams', {year: t.year, term: t.term}, 25000);
+  state.preferences.examCache = {...(state.preferences.examCache || {}), [t.year + '-' + t.term]: {at: Date.now(), year: t.year, term: t.term, exams: Array.isArray(r?.exams) ? r.exams : []}};
+  await save();
+  if (!quiet) haptic('confirm');
+ } catch (e) { state.examError = e.code === 'AUTH' ? 'needsLogin' : quiet ? '' : C.errorText(e); }
+ finally { examBusy = false; if (state.page === 'exams') render(); }
+}
 function profileCard() {
  const p = state.profile, bad = restricted(), name = p?.name || '我的账号';
  // 学校没有部门信息时会返回“未知部门”，这种占位不显示。
@@ -1901,7 +2153,7 @@ async function collapse(el) {
  if (!el?.animate || !motionOn()) return;
  const h = el.getBoundingClientRect().height;
  // 播放途中卡片被重画替换掉时，旧元素上的动画不会结束：最多等 0.3 秒
- const a = el.animate([{opacity: 1, height: h + 'px', overflow: 'hidden'}, {opacity: 0, height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px', overflow: 'hidden'}], {duration: 240, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards'});
+ const a = el.animate([{opacity: 1, height: h + 'px', overflow: 'hidden'}, {opacity: 0, height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px', overflow: 'hidden'}], {duration: 240, easing: EASE.out, fill: 'forwards'});
  await Promise.race([a.finished.catch(() => {}), sleep(300)]);
 }
 function opWorking(...ids) { const w = state.opWorking; return !!w && ids.some(x => x != null && String(x) === w); }
@@ -1973,9 +2225,10 @@ function showDialog(html, kind = '') {
  d.dataset.kind = kind;
  d.innerHTML = '<div class="sheet" tabindex="-1" autofocus><div class="sheet-handle"></div><button class="icon-btn sheet-close" data-action="closeDialog" aria-label="关闭">' + I.close + '</button>' + html + '</div>';
  if (!d.open) { d.showModal(); return; }
+ playTapMorph();
  if (!morph) return;
  const to = d.getBoundingClientRect().height;
- if (Math.abs(to - from) > 2) d.animate([{height: from + 'px', overflow: 'hidden'}, {height: to + 'px', overflow: 'hidden'}], {duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)'});
+ if (Math.abs(to - from) > 2) d.animate([{height: from + 'px', overflow: 'hidden'}, {height: to + 'px', overflow: 'hidden'}], {duration: 240, easing: EASE.out});
  if (swap) for (const el of d.querySelectorAll('.sheet > :not(.sheet-handle):not(.sheet-close)')) el.animate([{opacity: 0, transform: 'translateY(6px)'}, {opacity: 1, transform: 'none'}], {duration: 220, delay: 40, easing: 'ease-out', fill: 'backwards'});
 }
 function closeDialog(force = false) {
@@ -1984,8 +2237,48 @@ function closeDialog(force = false) {
  // 关的时候先往下滑出再真正关闭；期间又打开了新弹窗就不关。
  if (!motionOn()) { d.close(); return; }
  d.classList.add('closing'); clearTimeout(d.closeTimer);
- d.closeTimer = setTimeout(() => { if (d.classList.contains('closing')) { d.classList.remove('closing'); d.close(); } }, 170);
+ // 等滑出动画真正播完再关（手机和电脑时长不同，都写在样式表里）；计时器只兜底，免得动画没触发时关不掉
+ const finish = () => { clearTimeout(d.closeTimer); d.removeEventListener('animationend', onEnd); if (d.classList.contains('closing')) { d.classList.remove('closing'); d.close(); } };
+ const onEnd = e => { if (e.target === d) finish(); };
+ d.addEventListener('animationend', onEnd);
+ d.closeTimer = setTimeout(finish, 400);
 }
+// 手机底部弹窗可以往下拖关：弹窗内容滚到顶时按住往下拉，跟手下移、遮罩变淡；拉过 1/4 或甩一下就关，不够就弹回
+(() => {
+ const d = $('#dialog'), drag = {y0: 0, t0: 0, dy: 0, on: false, track: false};
+ const reset = () => { d.style.removeProperty('transform'); d.style.removeProperty('--scrim-o'); d.classList.remove('dragging'); };
+ d.addEventListener('touchstart', e => {
+  drag.track = innerWidth < 720 && e.touches.length === 1 && d.scrollTop <= 0 && d.dataset.kind !== 'consent' && !e.target.closest('input, select, textarea, .chip-row.scroll, .rules, .legal');
+  drag.y0 = e.touches[0].clientY; drag.t0 = Date.now(); drag.dy = 0; drag.on = false;
+ }, {passive: true});
+ d.addEventListener('touchmove', e => {
+  if (!drag.track) return;
+  const dy = e.touches[0].clientY - drag.y0;
+  if (!drag.on) { if (dy < -4 || d.scrollTop > 0) { drag.track = false; return; } if (dy < 8) return; drag.on = true; d.classList.add('dragging'); d.getAnimations().forEach(a => a.finish()); }
+  e.preventDefault();
+  drag.dy = Math.max(0, dy - 8);
+  d.style.transform = 'translateY(' + drag.dy + 'px)';
+  d.style.setProperty('--scrim-o', String(Math.max(0, 1 - drag.dy / (d.offsetHeight || 1))));
+ }, {passive: false});
+ const end = () => {
+  if (!drag.on) { drag.track = false; return; }
+  drag.on = drag.track = false;
+  const fast = drag.dy / Math.max(1, Date.now() - drag.t0) > .6, from = drag.dy;
+  d.classList.remove('dragging');
+  if (from > d.offsetHeight / 4 || fast && from > 30) {
+   haptic('tick');
+   const a = d.animate([{transform: 'translateY(' + from + 'px)'}, {transform: 'translateY(' + (d.offsetHeight + 40) + 'px)'}], {duration: 180, easing: EASE.in, fill: 'forwards'});
+   d.classList.add('closing-drag');
+   let ran = false;
+   const fin = () => { if (ran) return; ran = true; a.cancel(); reset(); d.classList.remove('closing-drag'); if (d.open) d.close(); };
+   a.finished.then(fin, fin); setTimeout(fin, 300);
+  } else {
+   d.animate([{transform: 'translateY(' + from + 'px)'}, {transform: 'none'}], {duration: 360, easing: SPRING.sheet});
+   reset();
+  }
+ };
+ d.addEventListener('touchend', end); d.addEventListener('touchcancel', end);
+})();
 // 教务会话只在本次运行里建立，没连上不一定是没登录，所以文字用“未连接 / 连接”。
 // 教务的连接状态按空教室实际在用的来源显示：离线模式下不再显示“已连接”。
 function teachingNote() { return state.teachingOptions?.offline ? '没连上，空教室用本机数据' : ''; }
@@ -2018,8 +2311,8 @@ function notifySection() {
 function androidName(sdk) { return ({24: '7', 25: '7.1', 26: '8', 27: '8.1', 28: '9', 29: '10', 30: '11', 31: '12', 32: '12L', 33: '13', 34: '14', 35: '15', 36: '16'})[sdk] || String(sdk || '?'); }
 function settingsDialog() {
  const p = state.preferences;
- const seg = (name, list) => '<div class="seg">' + list.map(([v, l]) => '<label><input type="radio" name="' + name + '" value="' + v + '"' + (p[name] === v ? ' checked' : '') + '><span>' + l + '</span></label>').join('') + '</div>';
- showDialog('<h2>设置</h2><form id="settingsForm">' + (NW ? '<fieldset class="seg-group"><legend>外观</legend>' + seg('mascotTheme', [['classic', '经典'], ['naiwa', '奶蛙']]) + '</fieldset>' : '') + '<fieldset class="seg-group"><legend>' + (NW ? '明暗模式' : '主题') + '</legend>' + seg('theme', [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']]) + '</fieldset><fieldset class="seg-group"' + (NW ? ' data-naiwa-accents' : '') + '><legend>主题色</legend><div class="swatches">' + ACCENTS.map(([id, , name]) => '<label class="swatch"><input type="radio" name="accent" value="' + id + '"' + ((p.accent || 'blue') === id ? ' checked' : '') + '><span class="c-' + id + '"></span><small>' + name + '</small></label>').join('') + '</div></fieldset>' + (NW ? '<p class="naiwa-help" data-naiwa-hint>奶蛙使用暖黄配色；切回经典后恢复你选的主题色。</p>' : '') + '<fieldset class="seg-group"><legend>动画</legend>' + seg('motion', [['auto', '标准'], ['off', '减少动画']]) + '</fieldset>' + notifySection()
+ const seg = (name, list) => '<div class="seg">' + list.map(([v, l]) => '<label><input type="radio" name="' + name + '" value="' + v + '"' + ((p[name] ?? list[0][0]) === v ? ' checked' : '') + '><span>' + l + '</span></label>').join('') + '</div>';
+ showDialog('<h2>设置</h2><form id="settingsForm">' + (NW ? '<fieldset class="seg-group"><legend>外观</legend>' + seg('mascotTheme', [['classic', '经典'], ['naiwa', '奶蛙']]) + '</fieldset>' : '') + '<fieldset class="seg-group"><legend>' + (NW ? '明暗模式' : '主题') + '</legend>' + seg('theme', [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']]) + '</fieldset><fieldset class="seg-group"' + (NW ? ' data-naiwa-accents' : '') + '><legend>主题色</legend><div class="swatches">' + ACCENTS.map(([id, , name]) => '<label class="swatch"><input type="radio" name="accent" value="' + id + '"' + ((p.accent || 'blue') === id ? ' checked' : '') + '><span class="c-' + id + '"></span><small>' + name + '</small></label>').join('') + '</div></fieldset>' + (NW ? '<p class="naiwa-help" data-naiwa-hint>奶蛙使用暖黄配色；切回经典后恢复你选的主题色。</p>' : '') + '<fieldset class="seg-group"><legend>动画</legend>' + seg('motion', [['auto', '标准'], ['off', '减少动画']]) + '</fieldset>' + (state.platform === 'android' ? '<fieldset class="seg-group"><legend>底栏</legend>' + seg('glass', [['auto', '毛玻璃'], ['off', '不透明']]) + '<p class="muted small">毛玻璃更好看，但更费电；配置较低的手机会自动用不透明。</p></fieldset>' : '') + notifySection()
   + (state.platform === 'windows' ? '<fieldset class="seg-group"><legend>系统通知</legend><label class="switch-row"><span><b>Windows 通知</b><span class="muted small">预约结果、登录失效、签到提醒；窗口在前台时不弹</span></span><input type="checkbox" class="switch" id="desktopNotify"' + (state.preferences.desktopNotify !== false ? ' checked' : '') + '></label><button type="button" class="btn tonal sm" data-action="testNotify">发一条测试通知</button></fieldset><p class="muted small">Ctrl + 1–4 切换功能，Ctrl + R 刷新座位，Esc 关闭弹窗或学校页面。</p>' : '')
   + (PUBLIC ? '<fieldset class="seg-group"><legend>支持作者</legend><label class="switch-row"><span><b>在“我的”页显示收款码</b><span class="muted small">自愿支持，关掉不影响任何功能</span></span><input type="checkbox" class="switch" id="donateOn"' + (state.preferences.donateHidden ? '' : ' checked') + '></label></fieldset>' : '')
   + (PUBLIC ? '<fieldset class="seg-group"><legend>协议与数据</legend><div class="actions"><button type="button" class="btn tonal sm" data-action="legal">用户协议与隐私说明</button><button type="button" class="btn text sm danger" data-action="withdrawConsent">撤回同意并清除本机数据</button></div></fieldset>' : '')
@@ -2043,6 +2336,9 @@ function applyAppearance() {
  const theme = p.theme === 'system' && typeof state.systemDark === 'boolean' ? (state.systemDark ? 'dark' : 'light') : p.theme;
  root.dataset.theme = theme;
  root.dataset.motion = p.motion;
+ // 悬浮底栏毛玻璃：小米 11 上滑动不掉帧，但合成线程忙一倍；内存或核数少的手机、减少动画、选了“不透明”时关掉
+ const lowEnd = (navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4;
+ if (p.glass !== 'off' && p.motion !== 'off' && !lowEnd) root.dataset.glass = ''; else delete root.dataset.glass;
  const dark = theme === 'dark' || theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches;
  const accent = window.NaiwaTheme?.apply(p, dark) || applyAccent(dark);
  window.NaiwaTheme?.syncSettings();
@@ -2063,6 +2359,7 @@ function go(page) {
  const work = () => {
   if (['tasks', 'me'].includes(state.page) && state.libraryConnected && !state.recordsLoaded && !state.reading.records) loadRecords(true);
   if (state.page === 'me') { loadAccountStatus(); maybeThanks(); }
+  if (state.page === 'exams') { const t = examTerm(state.examPrev), c = state.preferences.examCache?.[t.year + '-' + t.term]; if (!c) loadExams(); else if (onlineRooms() && Date.now() - c.at > 6 * 3600000) loadExams({quiet: true}); }
   if (state.page === 'rooms' && !onlineRooms()) autoConnectTeaching();
  };
  if (animate && state.platform === 'android' && motionOn()) setTimeout(work, 280); else work();
@@ -2125,6 +2422,10 @@ async function action(name, arg = '') {
   case 'clearPeriods': { const form = $('#roomForm'); if (form) { $$('#roomForm [name="period"]').forEach(x => x.checked = false); form.dispatchEvent(new Event('change', {bubbles: true})); } break; }
   case 'book': bookDialog(); break;
   case 'confirmBook': await confirmBook(); break;
+  case 'loadExams': await loadExams(); break;
+  case 'calendarExams': await calendarExams(); break;
+  case 'allExams': allExamsDialog(); break;
+  case 'officialExams': closeDialog(); await host('openOfficial', {target: state.platform === 'android' ? 'exams' : 'teaching', accountId: state.activeAccountId}); break;
   case 'retryBook': await retryBook(); break;
   case 'teachingOptions': await connectTeaching(); break;
   case 'forget': {
@@ -2199,6 +2500,8 @@ document.addEventListener('click', async e => {
   if (ds.checkout) { checkoutDialog(ds.checkout); return; }
   if (ds.confirmCheckout) { await confirmCheckout(ds.confirmCheckout); return; }
   if (ds.cancelBooking) { cancelBookingDialog(ds.cancelBooking); return; }
+  if (ds.exam) { examDialog(ds.exam); return; }
+  if (ds.examTerm) { const prev = ds.examTerm === 'prev'; if (prev !== !!state.examPrev) { state.examPrev = prev; state.examError = ''; render(); const t = examTerm(prev); if (!state.preferences.examCache?.[t.year + '-' + t.term]) loadExams(); } return; }
   if (ds.confirmCancel) { await confirmCancelBooking(ds.confirmCancel); return; }
   if (ds.roomOpen) { const x = state.rooms?.rooms.find(r => same(r.id, ds.roomOpen)); if (x) openRoomDay({name: x.name, exactId: x.id, title: x.name}); return; }
   if (ds.roomShift) { const n = Number(ds.roomShift); if (n) swapNext('#dialog .room-day, #dialog .day-nav strong', n > 0 ? 24 : -24); shiftRoomDay(n); return; }
@@ -2265,7 +2568,7 @@ document.addEventListener('change', async e => {
    }
    return;
   }
-  if (el.closest?.('#settingsForm')) { haptic('tick'); if (el.name === 'theme' || el.name === 'motion' || el.name === 'accent') { state.preferences[el.name] = el.value; applyAppearance(); await save(); } return; }
+  if (el.closest?.('#settingsForm')) { haptic('tick'); if (el.name === 'theme' || el.name === 'motion' || el.name === 'glass' || el.name === 'accent') { state.preferences[el.name] = el.value; applyAppearance(); await save(); } return; }
   if (el.closest?.('#roomForm')) {
    if (e.isTrusted) haptic('tick');
    state.preferences.roomQuery = roomQueryFromForm($('#roomForm'));
@@ -2327,6 +2630,51 @@ function searchInput(el) {
  else if (el.name === 'week' && el.closest('#roomForm') && state.preferences.roomQuery && Number(el.value) >= 1) state.preferences.roomQuery = {...state.preferences.roomQuery, week: Number(el.value)};
 }
 // 中文输入法还在拼写时整页重画会把输入框换掉、打断输入：等选好字（compositionend）再处理。
+// 悬浮底栏的滑块可以按住拖：按住约 0.25 秒或按下后横着拖，滑块浮起来跟着手指走，经过的图标放大、轻震；松手停在哪个就切到哪个（仿 iOS 26 底栏）
+const navDrag = {id: null, timer: 0, on: false, x0: 0, over: null, ate: 0};
+function navButtons(nav) { return [...nav.querySelectorAll('button[data-page]')].filter(b => !b.hidden && getComputedStyle(b).display !== 'none'); }
+function navDragMove(nav, x) {
+ const pill = nav.querySelector('.nav-pill'), r = nav.getBoundingClientRect();
+ if (!pill) return;
+ // 拖动时滑块以中心放大 1.12 倍、左右各多出 6%，按底栏内侧宽度（不含边框）夹住，贴边时不冒出底栏
+ const w = pill.offsetWidth, grow = w * .06, left = Math.min(Math.max(x - r.left - nav.clientLeft - w / 2, 6 + grow), nav.clientWidth - w - 6 - grow);
+ pill.style.transform = 'translateX(' + left + 'px) scale(1.12, 1.16)';
+ const over = navButtons(nav).find(b => { const q = b.getBoundingClientRect(); return x >= q.left && x < q.right; }) || null;
+ if (over !== navDrag.over) { navDrag.over?.classList.remove('lens'); over?.classList.add('lens'); if (navDrag.over && over) haptic('tick'); navDrag.over = over; }
+}
+function navDragStart(nav, x) {
+ navDrag.on = true; nav.classList.add('dragging'); haptic('tap'); navDragMove(nav, x);
+}
+function navDragEnd(nav, commit) {
+ clearTimeout(navDrag.timer);
+ const was = navDrag.on, target = navDrag.over;
+ navDrag.id = null; navDrag.on = false; navDrag.over?.classList.remove('lens'); navDrag.over = null;
+ if (!was) return;
+ // 从松手时滑块所在的位置弹到目标，不是先跳回原位再滑
+ const pill = nav.querySelector('.nav-pill'), m = pill && new DOMMatrix(getComputedStyle(pill).transform);
+ nav.classList.remove('dragging'); navDrag.ate = Date.now() + 400; pillAt = pill ? Math.round(m.e) + ',' + pill.offsetWidth : '';
+ if (commit && target && pageFor(target.dataset.page) !== state.page) go(target.dataset.page); else movePill(nav);
+}
+(() => {
+ const nav = $('.nav');
+ if (!nav) return;
+ nav.addEventListener('pointerdown', e => {
+  if (getComputedStyle(nav).position !== 'fixed' || navDrag.id != null || !nav.querySelector('.nav-pill')) return;
+  navDrag.id = e.pointerId; navDrag.x0 = e.clientX; navDrag.ate = 0;
+  navDrag.timer = setTimeout(() => { if (navDrag.id === e.pointerId) navDragStart(nav, navDrag.x0); }, 250);
+ });
+ nav.addEventListener('pointermove', e => {
+  if (e.pointerId !== navDrag.id) return;
+  if (!navDrag.on && Math.abs(e.clientX - navDrag.x0) > 10) { clearTimeout(navDrag.timer); navDragStart(nav, e.clientX); }
+  if (navDrag.on) { try { nav.setPointerCapture(e.pointerId); } catch (x) {} navDragMove(nav, e.clientX); }
+ });
+ nav.addEventListener('pointerup', e => { if (e.pointerId === navDrag.id) navDragEnd(nav, true); });
+ nav.addEventListener('pointercancel', e => { if (e.pointerId === navDrag.id) navDragEnd(nav, false); });
+ nav.addEventListener('contextmenu', e => e.preventDefault());
+ // 拖完松手时浏览器可能补一个点击：只吃松手后 0.4 秒内的这一次，免得又切回按下时那一页。
+ // 不能一直挂着等它：拖得远时浏览器不补，之后没有“按下”的点击（无障碍服务点按、脚本）会被误吞
+ nav.addEventListener('click', e => { if (Date.now() < navDrag.ate) { navDrag.ate = 0; e.preventDefault(); e.stopPropagation(); } }, true);
+})();
 document.addEventListener('input', e => { if (!e.isComposing) searchInput(e.target); });
 document.addEventListener('compositionend', e => searchInput(e.target));
 document.addEventListener('focusin', e => { if (!e.target.matches?.(TEXT_INPUT)) return; imeTarget = e.target; setTimeout(revealInput, 400); if (!e.target.closest('dialog')) { document.body.classList.add('typing'); updateDock(); } });

@@ -18,8 +18,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Reflection.AssemblyTitle("工大学伴")]
 [assembly: System.Reflection.AssemblyProduct("工大学伴")]
 [assembly: System.Reflection.AssemblyDescription("工大学伴")]
-[assembly: System.Reflection.AssemblyVersion("0.9.25.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.9.25.0")]
+[assembly: System.Reflection.AssemblyVersion("0.9.28.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.9.28.0")]
 
 static class Program {
  [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
@@ -336,7 +336,7 @@ sealed class CampusForm:Form {
   if(accountId==ActiveAccountId){current="library";currentAccountId=accountId;ShowOfficial(web,Str(Account(accountId),"label")+" · 请完成学校验证后返回助手");}return false;
  }
  async Task<object> Call(string system,string method,Dictionary<string,object> p,string accountId=null){
-  accountId=AccountId(accountId);var allowed=system=="library"?new[]{"status","catalog","areas","seats","records","reserve","current","temporaryLeave","profile","violations","rules","cancelBooking","checkout"}:new[]{"status","options","rooms"};if(!allowed.Contains(method))throw new Exception("不支持的学校操作");
+  accountId=AccountId(accountId);var allowed=system=="library"?new[]{"status","catalog","areas","seats","records","reserve","current","temporaryLeave","profile","violations","rules","cancelBooking","checkout"}:new[]{"status","options","rooms","exams"};if(!allowed.Contains(method))throw new Exception("不支持的学校操作");
   var web=await EnsureSchool(system,accountId);
   for(int i=0;i<30;i++){if(web.CoreWebView2!=null&&web.Source!=null&&web.Source.Host==(system=="library"?"libyuyue.qlu.edu.cn":"jw.qlu.edu.cn")){if(await web.CoreWebView2.ExecuteScriptAsync("typeof window.QluAgent==='object'")=="true")break;}if(i==29)throw new SchoolException("AUTH","请先在该账号的官方页面完成登录",false);await Task.Delay(400);}
   string id=Guid.NewGuid().ToString("N");var pending=new TaskCompletionSource<Dictionary<string,object>>();requests[id]=pending;requestOwners[id]=system+":"+accountId;

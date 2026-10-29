@@ -1,7 +1,7 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.qlucampus.gongda" android:versionCode="21" android:versionName="1.1.19">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.qlucampus.gongda" android:versionCode="24" android:versionName="1.1.22">
  <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35"/>
  <uses-permission android:name="android.permission.INTERNET"/>
- <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+ <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.READ_CALENDAR"/><uses-permission android:name="android.permission.WRITE_CALENDAR"/>
  <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
  <!-- 签到提醒要按时：Android 12–12L 用 SCHEDULE_EXACT_ALARM（默认允许），13 起用 USE_EXACT_ALARM（安装即授予）。重启后重新设置提醒用 RECEIVE_BOOT_COMPLETED，设完即退出、不常驻。 -->
  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>

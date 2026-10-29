@@ -10,7 +10,8 @@
  --shadow:none;
  --shadow-up:0 -6px 24px rgb(0 0 0 / .08);
  --scrim:rgb(0 0 0 / .4);--bar:rgb(247 247 247 / .86);
- --nav-h:0px;--dock-h:0px;--appbar-h:56px;
+ --ease-out:cubic-bezier(.2,.8,.2,1);--ease-in:cubic-bezier(.4,0,1,1);--spring:cubic-bezier(.2,.9,.3,1);
+ --nav-h:0px;--dock-h:0px;--sab:0px;--safe-b:max(env(safe-area-inset-bottom,0px),var(--sab));--appbar-h:56px;
  color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){
@@ -72,7 +73,7 @@ button:disabled{cursor:default}
 
 /* ---------- 布局与导航 ---------- */
 .content{padding:8px 16px calc(var(--dock-h) + 28px);max-width:1120px;margin:0 auto;min-width:0}
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line);padding:4px 4px calc(4px + var(--safe-b))}
 .nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:4px 0;border:0;background:none;color:var(--muted);font-size:12px}
 .nav .ic{position:relative;display:grid;place-items:center;width:56px;height:30px;border-radius:15px;transition:background .2s}
 .nav .icon{width:22px;height:22px}
@@ -99,7 +100,6 @@ button:disabled{cursor:default}
 .btn.xl{min-height:56px;padding:0 28px;border-radius:28px;font-size:16px}
 .btn.sm{min-height:34px;padding:0 14px;font-size:13px}
 .btn:disabled{opacity:.38}
-.btn:not(:disabled):active{transform:scale(.97)}
 .btn .icon{width:18px;height:18px}
 .icon-btn{display:inline-grid;place-items:center;width:40px;height:40px;flex-shrink:0;border:0;border-radius:20px;background:transparent;color:var(--muted)}
 .icon-btn:not(:disabled):active{background:var(--surface-3)}
@@ -206,7 +206,6 @@ progress::-moz-progress-bar{background:var(--primary)}
 .seat{position:relative;min-height:48px;padding:0 2px;border:0;border-radius:12px;background:var(--seat);color:var(--on-seat);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;transition:background .15s,transform .15s}
 .seat:disabled{background:var(--seat-busy);color:var(--on-seat-busy);font-weight:400}
 .seat.sel{background:var(--primary);color:var(--on-primary)}
-.seat:not(:disabled):active{transform:scale(.93)}
 .seat.fav:before{content:"★";position:absolute;left:5px;top:2px;font-size:9px;color:#e8a200}
 .seat .order{position:absolute;right:-3px;top:-3px;display:grid;place-items:center;width:18px;height:18px;border-radius:9px;background:var(--surface);color:var(--primary);font:700 11px/1 system-ui,sans-serif;font-style:normal;box-shadow:0 0 0 2px var(--primary)}
 .seat-foot{margin:12px 4px 0;font-size:12px}
@@ -273,7 +272,7 @@ progress::-moz-progress-bar{background:var(--primary)}
 
 /* ---------- 入馆码 ---------- */
 .pass-card{text-align:center;padding:32px 20px 24px}
-.pass-art{display:grid;place-items:center;width:120px;height:120px;margin:0 auto 18px;border-radius:28px;background:linear-gradient(135deg,#0a5cf5,#14c7e6);color:#fff}
+.pass-art{display:grid;place-items:center;width:120px;height:120px;margin:0 auto 18px;border-radius:28px;background:var(--primary);background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 55%,#fff));color:var(--on-primary);box-shadow:0 10px 28px color-mix(in srgb,var(--primary) 30%,transparent)}
 .pass-art .icon{width:64px;height:64px;stroke-width:1.5}
 .pass-card h2{font-size:21px;margin-bottom:8px}
 .pass-card p{max-width:28em;margin:0 auto}
@@ -285,7 +284,7 @@ progress::-moz-progress-bar{background:var(--primary)}
 dialog{width:calc(100% - 20px);max-width:100%;max-height:90vh;margin:auto auto 10px;padding:0;border:0;border-radius:30px;background:var(--surface);color:var(--text);box-shadow:var(--shadow-up);overflow:auto;overscroll-behavior:contain}
 dialog::backdrop{background:var(--scrim)}
 .sheet:focus{outline:none}
-.sheet{position:relative;padding:10px 20px calc(20px + env(safe-area-inset-bottom))}
+.sheet{position:relative;padding:10px 20px 20px}
 .sheet-handle{width:36px;height:4px;margin:0 auto 14px;border-radius:2px;background:var(--outline)}
 .sheet-close{position:absolute;top:8px;right:8px}
 .sheet h2{font-size:20px;margin:0 40px 14px 0}
@@ -301,7 +300,7 @@ dialog::backdrop{background:var(--scrim)}
 .switch-row{display:flex;align-items:center;gap:12px;padding:12px 14px 12px 16px;margin-bottom:8px;border-radius:16px;background:var(--surface-2);cursor:pointer}
 .switch-row>span{flex:1;display:flex;flex-direction:column;gap:2px}
 .switch{-webkit-appearance:none;appearance:none;position:relative;flex-shrink:0;width:50px;height:30px;margin:0;border-radius:15px;background:var(--surface-3);cursor:pointer;transition:background .2s}
-.switch:before{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / .25);transition:transform .25s cubic-bezier(.3,.7,.4,1.2)}
+.switch:before{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / .25);transition:transform .3s var(--spring)}
 .switch:checked{background:var(--primary)}
 .switch:checked:before{transform:translateX(20px)}
 .conn-row{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px}
@@ -409,8 +408,6 @@ dialog::backdrop{background:var(--scrim)}
 
 /* ---------- 动效 ---------- */
 @keyframes fade-in{from{opacity:0}to{opacity:1}}
-@keyframes slide-r{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
-@keyframes slide-l{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
 @keyframes vt-out-l{to{opacity:0;transform:translateX(-36px)}}
 @keyframes vt-in-r{from{opacity:0;transform:translateX(48px)}}
 @keyframes vt-out-r{to{opacity:0;transform:translateX(36px)}}
@@ -419,7 +416,6 @@ dialog::backdrop{background:var(--scrim)}
 @keyframes fade-through{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
 @keyframes panel-up{from{transform:translateY(100%);opacity:.6}to{transform:none;opacity:1}}
 @keyframes tab-pop{0%{transform:scale(.85)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
-@keyframes seat-pop{0%{transform:scale(.8)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
 @keyframes sheet-out{to{transform:translateY(60px);opacity:0}}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
@@ -427,14 +423,11 @@ dialog::backdrop{background:var(--scrim)}
 .skel-row{display:flex;justify-content:space-between;align-items:center;padding:16px;border-top:1px solid var(--line)}.skel-row .w60{width:55%;height:16px}.skel-row .w30{width:18%;height:22px}
 .seat-skel{min-height:48px;border-radius:12px}
 .skel-bar{height:44px;margin:10px 0}.skel-tools{display:flex;gap:8px;margin-bottom:10px}.skel-tools .skel{height:40px;flex:1;border-radius:20px}.skel-tools .skel:first-child{flex:2}.skel-meta{width:40%;height:22px;margin-bottom:12px;border-radius:11px}
-@keyframes sheet-in{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes sheet-in{from{transform:translateY(64px);opacity:0}to{transform:none;opacity:1}}
 @keyframes pop-in{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 @media (prefers-reduced-motion:no-preference){
- html:not([data-motion=off]) .page-enter.fade{animation:fade-in .22s ease-out}
- html:not([data-motion=off]) .page-enter.from-right{animation:slide-r .26s cubic-bezier(.2,.8,.2,1)}
- html:not([data-motion=off]) .page-enter.from-left{animation:slide-l .26s cubic-bezier(.2,.8,.2,1)}
  /* 新结果前几行依次浮现 */
- html:not([data-motion=off]) .fresh .room-row:nth-child(-n+14),html:not([data-motion=off]) .fresh .area-row:nth-child(-n+14){animation:rise .3s cubic-bezier(.2,.8,.2,1) both}
+ html:not([data-motion=off]) .fresh .room-row:nth-child(-n+14),html:not([data-motion=off]) .fresh .area-row:nth-child(-n+14){animation:rise .3s var(--ease-out) both}
  html:not([data-motion=off]) .fresh :is(.room-row,.area-row):nth-child(2){animation-delay:22ms}
  html:not([data-motion=off]) .fresh :is(.room-row,.area-row):nth-child(3){animation-delay:44ms}
  html:not([data-motion=off]) .fresh :is(.room-row,.area-row):nth-child(4){animation-delay:66ms}
@@ -459,29 +452,30 @@ dialog::backdrop{background:var(--scrim)}
  html[data-vt=tab]::view-transition-new(root){animation:fade-through .22s cubic-bezier(0,0,.2,1) .07s both}
  /* 进区域 / 返回：旧页先快速让开，新页随后滑入 */
  html[data-vt=forward]::view-transition-old(root){animation:vt-out-l .12s cubic-bezier(.4,0,1,1) both}
- html[data-vt=forward]::view-transition-new(root){animation:vt-in-r .26s cubic-bezier(.2,.8,.2,1) .05s both}
+ html[data-vt=forward]::view-transition-new(root){animation:vt-in-r .26s var(--ease-out) .05s both}
  html[data-vt=back]::view-transition-old(root){animation:vt-out-r .12s cubic-bezier(.4,0,1,1) both}
- html[data-vt=back]::view-transition-new(root){animation:vt-in-l .26s cubic-bezier(.2,.8,.2,1) .05s both}
+ html[data-vt=back]::view-transition-new(root){animation:vt-in-l .26s var(--ease-out) .05s both}
  html[data-vt=fade]::view-transition-old(root){animation:fade-out .15s both}
  html[data-vt=fade]::view-transition-new(root){animation:fade-in .22s both}
  ::view-transition-group(nav),::view-transition-group(appbar){animation-duration:.2s}
  /* 底栏：选中的图标弹一下，底色渐变 */
  html:not([data-motion=off]) .nav button[aria-current=page] .ic{animation:tab-pop .32s cubic-bezier(.3,1.6,.5,1)}
- /* 选座：刚选的那个弹一下；骨架换成座位时淡入 */
- html:not([data-motion=off]) .seat.pop{animation:seat-pop .28s cubic-bezier(.3,1.6,.5,1)}
+ /* 骨架换成座位时淡入（选座的弹一下由脚本统一的按下回弹负责） */
  html:not([data-motion=off]) .seat-card.appear .seat-grid{animation:fade-in .25s ease-out}
  /* 弹窗关闭：往下滑出 */
- html:not([data-motion=off]) dialog[open].closing{animation:sheet-out .17s cubic-bezier(.4,0,1,1) forwards}
- html:not([data-motion=off]) dialog[open].closing::backdrop{animation:fade-out .17s forwards}
+ html:not([data-motion=off]) dialog[open].closing{animation:sheet-out .18s var(--ease-in) forwards}
+ html:not([data-motion=off]) dialog[open].closing::backdrop{animation:fade-out .18s var(--ease-in) forwards}
  /* 预约栏滑上来、条件表单展开 */
- html:not([data-motion=off]) .sel-panel.appear{animation:panel-up .26s cubic-bezier(.2,.8,.2,1)}
+ html:not([data-motion=off]) .sel-panel.appear{animation:panel-up .36s var(--spring)}
  html:not([data-motion=off]) .card.current.just-booked{animation:booked-in .5s cubic-bezier(.2,.9,.3,1)}
  html:not([data-motion=off]) .record.just-booked{animation:booked-row 1.2s ease-out}
- html:not([data-motion=off]) .room-form.appear{animation:rise .24s cubic-bezier(.2,.8,.2,1)}
+ html:not([data-motion=off]) .room-form.appear{animation:rise .24s var(--ease-out)}
  /* 按下时轻轻缩一下 */
- html:not([data-motion=off]) :is(.btn,.chip,.seat,.area-row,.room-main,.achv,.icon-btn,.nav button):active{transform:scale(.96);transition:transform .08s}
- html:not([data-motion=off]) dialog[open]{animation:sheet-in .28s cubic-bezier(.2,.9,.3,1)}
- html:not([data-motion=off]) .toast:not(.hide){animation:pop-in .25s cubic-bezier(.2,.9,.3,1)}
+ /* 按下：手指一碰就缩小（脚本加 .pressing），松手由脚本按弹簧弹回 */
+ html:not([data-motion=off]) .pressing:not(.seg > label):not(.swatch),html:not([data-motion=off]) :is(.seg > label,.swatch).pressing>span{transform:scale(.94);transition:transform .1s cubic-bezier(.2,0,0,1)}
+ html:not([data-motion=off]) .nav button.pressing .icon{transform:scale(.86)}
+ html:not([data-motion=off]) dialog[open]{animation:sheet-in .36s var(--spring)}
+ html:not([data-motion=off]) .toast:not(.hide){animation:pop-in .36s var(--spring)}
 }
 html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:after{animation-duration:.001s!important;animation-iteration-count:1!important;transition:none!important}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important}}
@@ -557,7 +551,6 @@ html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:a
 .room-find p{margin:8px 0 0}
 .room-find .room-date{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--muted);font-size:13px}.room-find .room-date input{height:40px}
 button.room-main{background:none;border:0;padding:4px 0;margin:0;text-align:left;color:inherit;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-button.room-main:active{opacity:.6}
 .day-nav{display:flex;align-items:center;gap:8px;margin:4px 0 14px}
 .day-nav>div{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center}
 .room-day{padding:12px 0;border-top:1px solid var(--line)}
@@ -608,7 +601,7 @@ button.room-main:active{opacity:.6}
 .celebrate{text-align:center;padding-top:8px}
 .thanks-icon{font-size:54px;line-height:1.1}.thanks h2{margin:4px 0 8px}
 .thanks-qr{display:block;margin:12px auto 6px;padding:6px;border:0;border-radius:14px;background:#fff;cursor:zoom-in;transition:width .25s}
-.thanks-qr img{display:block;width:120px;height:auto;border-radius:8px;transition:width .25s cubic-bezier(.2,.8,.2,1)}.thanks-qr.big img{width:240px}
+.thanks-qr img{display:block;width:120px;height:auto;border-radius:8px;transition:width .25s var(--ease-out)}.thanks-qr.big img{width:240px}
 .medal-big .icon{width:72px;height:72px;color:var(--warn);stroke-width:1.4}
 .confetti{position:fixed;inset:0;width:100vw;height:100vh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;pointer-events:none;overflow:hidden;z-index:2147483647}
 .confetti i{position:absolute;top:-16px;left:var(--x);width:8px;height:14px;border-radius:2px;animation:confetti-fall 2.2s cubic-bezier(.2,.6,.4,1) var(--d) forwards}
@@ -630,15 +623,15 @@ button.room-main:active{opacity:.6}
 .offline-card{display:flex;align-items:center;gap:12px;padding:14px 12px 14px 16px}
 .offline-card>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .room-results>.banner{margin:0 16px 8px}
-/* 长列表：屏幕外的行不排版不绘制；条件改了但还没重查时，旧结果变淡 */
-.room-row{content-visibility:auto;contain-intrinsic-size:auto 76px}
+/* 条件改了但还没重查时，旧结果变淡。
+   不用 content-visibility:auto：重画后新元素按估计高度（76px，实际 91px）排版，滚到下面再点筛选，整页会跳 */
 .room-results.stale .room-row,.room-results.stale .room-filter{opacity:.45}
 .stale-note{color:var(--warn);font-weight:600}
 .more-rooms{display:flex;width:calc(100% - 32px);margin:10px 16px 4px}
 .btn.busy{opacity:.7}
 .nw{white-space:nowrap}
-/* 屏幕外的卡片不排版不绘制：切页时新页面画得更快 */
-.content>.card:nth-of-type(n+3),.content>section:nth-of-type(n+3){content-visibility:auto;contain-intrinsic-size:auto 320px}
+/* 屏幕外的卡片原来用 content-visibility:auto 按 320px 估高度：整页重画后卡片是新元素、估计高度全错，
+   在“我的”页滚下去点签到提醒等选项时整页上下乱跳（真机录屏），所以去掉 */
 .achv-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
 .achv{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px 8px;border:0;border-radius:14px;background:var(--surface-2);color:var(--text);font:inherit;cursor:pointer}
 /* 没解锁：图标变灰、字变淡，进度条保留颜色，看得出快到了 */
@@ -662,3 +655,84 @@ html[data-platform=android] .nav [data-page=tasks],html[data-platform=windows] .
 @keyframes booked-row{0%{background:color-mix(in srgb,var(--primary) 22%,transparent)}100%{background:transparent}}
 /* 正在取消 / 结束使用的那张卡片：变淡、不能再点 */
 .card.current.working,.record.working{opacity:.5;pointer-events:none;transition:opacity .2s}
+/* 悬浮底栏：离开屏幕边缘的圆角胶囊，选中项下面一块浅色滑块；已选座位面板也浮在它上方 */
+.nav-pill{display:none}
+@media (max-width:719px){
+ .nav{left:12px;right:12px;bottom:calc(10px + var(--safe-b));padding:6px;border:1px solid color-mix(in srgb,var(--text) 9%,transparent);border-radius:30px;box-shadow:0 10px 30px rgb(0 0 0 / .14),0 1px 3px rgb(0 0 0 / .08)}
+ .nav button{position:relative;z-index:1;min-height:54px;border-radius:24px}
+ .nav .ic{background:none!important}
+ .nav-pill{display:block;position:absolute;z-index:0;top:6px;bottom:6px;left:0;width:0;border-radius:24px;background:var(--primary-soft);pointer-events:none}
+ .lib-side{left:10px;right:10px;bottom:calc(var(--nav-h) + 8px)}
+ .sel-panel{border-radius:24px;border:1px solid var(--line);box-shadow:0 10px 30px rgb(0 0 0 / .14)}
+}
+/* 安卓：不透明时用卡片色（深色模式下和纯黑背景分得开）；data-glass 打开毛玻璃，真机测过帧率再决定默认 */
+@media (max-width:719px){html[data-platform=android]:not([data-glass]) .nav{background:var(--surface)}html[data-platform=android][data-glass][data-theme] .nav,html[data-platform=android][data-glass] .nav{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}}
+/* 手机底部弹窗：整块不透明地从屏幕底下滑上来、滑下去，只让遮罩淡入淡出。
+   原来一边上移一边从半透明变实，高弹窗（设置）中间几帧和后面页面叠成重影；也和下拉关闭的动作一致 */
+@keyframes sheet-up{from{transform:translateY(calc(100% + 24px))}}
+@keyframes sheet-down{to{transform:translateY(calc(100% + 24px))}}
+@media (max-width:719px) and (prefers-reduced-motion:no-preference){
+ html:not([data-motion=off]) dialog[open]{animation:sheet-up .38s var(--spring)}
+ html:not([data-motion=off]) dialog[open].closing{animation:sheet-down .22s var(--ease-in) forwards}
+ html:not([data-motion=off]) dialog[open].closing::backdrop{animation:fade-out .22s var(--ease-in) forwards}
+}
+/* 界面铺到手势小白条下面后，底部弹窗浮在小白条上方 */
+@media (max-width:719px){dialog{margin-bottom:calc(10px + var(--safe-b))}}
+/* 拖底栏滑块时：滑块浮起、带玻璃高光；手指下的图标放大；整条底栏微微鼓起 */
+.nav{touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+@media (max-width:719px){
+ .nav{transition:transform .36s var(--spring)}
+ .nav.dragging{transform:scale(1.02)}
+ .nav.dragging .nav-pill{transition:none;box-shadow:0 8px 22px rgb(0 0 0 / .2),inset 0 1px 0 rgb(255 255 255 / .45),inset 0 0 0 1px rgb(255 255 255 / .25);background:color-mix(in srgb,var(--primary-soft) 82%,#fff)}
+ .nav .icon{transition:transform .3s var(--spring)}
+ /* 图标、文字的选中色跟滑块一起渐变，不要滑块还没动字就先亮了 */
+ .nav button{transition:color .24s ease-out}
+ html:not([data-motion=off]) .nav button[aria-current=page] .ic{animation:none}
+ .nav.dragging button.lens .icon{transform:scale(1.22)}
+ .nav.dragging button.lens{color:var(--primary)}
+}
+/* 第一次出现的卡片、提示升起淡入；不会被整页重画替换的控件（设置里的分段选择、按下态）用 CSS 过渡 */
+html:not([data-motion=off]) .first-show{animation:rise .32s var(--ease-out) both}
+.seg span,.chip,.icon-btn,.area-row,.room-row,.record{transition:background-color .2s,color .2s,box-shadow .2s,transform .15s}
+/* 选中高亮滑过去时的那块影子：垫在按钮文字下面 */
+/* 0.9.27 手机：弹窗下拉关闭、遮罩淡入；当前预约按钮分主次两行；座位页标题不折行 */
+dialog::backdrop{opacity:var(--scrim-o,1)}
+dialog.dragging::backdrop{transition:none}
+dialog.closing-drag::backdrop{opacity:0;transition:opacity .18s}
+html:not([data-motion=off]) dialog[open]:not(.closing)::backdrop{animation:fade-in .22s ease-out}
+@media (max-width:719px){
+ .current .actions .btn.filled,.current .actions .btn.tonal{flex:1 1 40%;min-height:44px;border-radius:22px}
+ .current .actions .btn.text{flex:1 1 20%;min-height:34px;padding:0 4px;font-size:13px;font-weight:500;border-radius:17px;background:color-mix(in srgb,var(--surface) 50%,transparent)}
+ .seat-title p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .seat-head .btn.sm[data-action=seatMap]{width:40px;min-height:40px;padding:0;border-radius:20px;background:transparent;color:var(--muted)}
+}
+.slide-ghost{position:absolute;left:0;top:0;z-index:0;pointer-events:none}.seg label,.chip-row>.chip{position:relative}.seg label>span,.chip-row>.chip{z-index:1}
+/* 考试安排：左边日期块，右边科目、时间、考场；已结束的变淡 */
+.exams-card .chip-row{margin:2px 0 10px}
+.exam-list{display:flex;flex-direction:column;gap:8px;margin:4px 0 8px}
+.exam-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px;border:0;border-radius:16px;background:var(--surface-2);color:var(--text);text-align:left}
+.exam-row.past{opacity:.55}
+.exam-row>.icon{width:18px;height:18px;color:var(--muted);flex:none}
+.exam-date{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:56px;padding:6px 4px;border-radius:12px;background:var(--primary-soft);color:var(--on-primary-soft)}
+.exam-date b{font-size:17px;font-variant-numeric:tabular-nums}.exam-date small{font-size:11px;opacity:.8}
+.exam-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.exam-main strong{font-size:16px;line-height:1.3}
+.exam-line{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:13px;min-width:0}
+.exam-line .icon{width:14px;height:14px;flex:none}
+.exam-line .badge{margin-left:4px;font-style:normal}
+.exam-note{display:flex;gap:6px;align-items:flex-start;margin:8px 0 0}.exam-note .icon{width:15px;height:15px;flex:none;margin-top:2px;color:var(--warn,#c88a00)}
+.exam-at{margin:4px 0 0}
+.exam-detail .record>div{display:flex;flex-direction:column;gap:2px}
+.exam-detail .record strong{font-weight:500;word-break:break-all}
+/* 考试页 */
+.exam-group{margin:14px 2px 6px;font-size:14px;color:var(--muted);font-weight:600}
+.exam-actions{display:flex;gap:8px;margin:12px 0 4px}.exam-actions .btn{flex:1}
+html[data-platform=windows] .nav [data-page=exams]{display:none}
+/* 入馆码在底栏正中：主题色圆形按钮，比两边略高 */
+@media (max-width:719px){
+ .nav [data-page=pass]{color:var(--primary);font-weight:600}
+ .nav [data-page=pass] .ic{width:50px;height:50px;margin-top:-20px;border-radius:50%;background:var(--primary)!important;color:var(--on-primary,#fff);box-shadow:0 6px 16px color-mix(in srgb,var(--primary) 40%,transparent),0 0 0 4px var(--surface)}
+ .nav [data-page=pass] .icon{width:24px;height:24px;stroke-width:2.2}
+ .nav.dragging [data-page=pass].lens .icon{transform:scale(1.12)}
+ .nav-pill.on-pass{opacity:0}
+}

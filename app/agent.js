@@ -160,8 +160,8 @@
  function weekFrom(start,first=1){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(start||'')))return null;const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date()),monday=x=>{const t=Date.parse(x+'T12:00:00Z');return t-((new Date(t).getUTCDay()+6)%7)*86400000;},w=Math.round((monday(day)-monday(start))/604800000)+(Number.isFinite(Number(first))?Number(first):1);return w>=1&&w<=30?w:null;}
  function termWeek(text){const t=String(text),dq=Number((t.match(/DQZC=(\d+)/)||[])[1]),zx=(t.match(/ZXZC=(\d+)/)||[])[1];return dq>0?dq:weekFrom((t.match(/ZXRQ=(\d{4}-\d{2}-\d{2})/)||[])[1],zx==null?1:Number(zx));}
  async function teaching(method,p){
-  const ctx=teachingContext();
-  if(method==='status')return{connected:!!ctx,page:location.pathname};
+  const ctx=teachingContext()||(method==='exams'&&location.hostname==='jw.qlu.edu.cn'?{w:window,d:document,url:new URL(location.href)}:null);
+  if(method==='status')return{connected:!!teachingContext(),page:location.pathname};
   if(!ctx)throw error('PAGE','未找到已加载的空闲教室页面，请在学生菜单打开后返回；支持页面内嵌的查询页');
   const d=ctx.d;
   if(method==='options'){
@@ -201,6 +201,20 @@
    const rows=Array.isArray(result?.items)?result.items:Array.isArray(result?.rows)?result.rows:null;
    if(!rows)throw error('PARSE','学校没有返回教室列表');
    return{total:Number(result.totalResult??result.total??result.records??rows.length),page:Math.max(1,Number(p.page)||1),pageSize:size,rooms:rows.map(x=>({id:x.cd_id||x.cdxqxx_id||x.cdbh,name:x.cdmc||x.cdbh||'教室',building:x.jxlmc||x.jxl||'',campus:x.xqmc||'',capacity:x.sjzws||x.zws||x.zwzs||x.zws1||'',reserved:['1','是','已被预约'].includes(String(x.sfybyy))}))};
+  }
+  // 考试信息：学校“学生考试信息查询”（只读）。在已登录的教务页里直接发请求；只回考试相关字段，学号姓名班级这类个人信息不带出去
+  if(method==='exams'){
+   const xnm=String(p.year||value(d,'xnm')),xqm=String(p.term||value(d,'xqm'));
+   if(!/^\d{4}$/.test(xnm)||!/^\d{1,2}$/.test(xqm))throw error('INVALID','请选择有效的学年学期');
+   const body=new URLSearchParams({xnm,xqm,ksmcdmb_id:'',kch:'',kc:'',ksrq:'',kkbm_id:'',_search:'false',nd:String(Date.now()),'queryModel.showCount':'200','queryModel.currentPage':'1','queryModel.sortName':'','queryModel.sortOrder':'asc',time:'0'});
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
+   let r;try{r=await ctx.w.fetch('/jwglxt/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105',{method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body,signal:ctl.signal});}catch(e){throw error(e?.name==='AbortError'?'TIMEOUT':'NETWORK',e?.name==='AbortError'?'教务响应超时':'连不上教务（网络断开或不在校园网）');}finally{clearTimeout(timer);}
+   if(r.status===401||r.status===403)throw error('AUTH','请重新登录学生教务');
+   let j;try{j=await r.json();}catch(e){throw error('PARSE','教务返回的不是考试信息，可能登录过期了');}
+   const rows=Array.isArray(j?.items)?j.items:null;
+   if(!rows)throw error('PARSE','学校没有返回考试列表');
+   const skip=new Set(['xh_id','xh','xm','xb','bj','njmc','zymc','jgmc','pycc','row_id','totalresult','xnm','xqm']);
+   return{year:xnm,term:xqm,exams:rows.map(x=>Object.fromEntries(Object.entries(x).filter(([k,v])=>!skip.has(k)&&v!=null&&v!==''&&typeof v!=='object').map(([k,v])=>[k,String(v).slice(0,200)])))};
   }
   throw error('INVALID','未知教务操作');
  }
