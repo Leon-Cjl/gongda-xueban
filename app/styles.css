@@ -2,11 +2,12 @@
    颜色只用自定义属性，不依赖 light-dark()/color-mix()，兼容较旧的系统 WebView。 */
 
 :root{
- --bg:#f7f7f7;--surface:#ffffff;--surface-2:#f0f0f0;--surface-3:#e3e3e3;
- --text:#1a1a1a;--muted:#737373;--line:#ececec;--outline:#d4d4d4;
- --primary:#3482ff;--on-primary:#ffffff;--primary-soft:#e6efff;--on-primary-soft:#1f66db;
- --ok:#16803d;--ok-soft:#dcf3e3;--warn:#a85f00;--warn-soft:#fff0d4;--err:#d93a30;--err-soft:#fde5e3;
- --seat:#e6efff;--on-seat:#1f66db;--seat-busy:#f2f2f2;--on-seat-busy:#b0b0b0;
+ --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--radius-control:12px;--radius-card:20px;--radius-sheet:28px;--touch:48px;
+ --bg:#f5f5f7;--surface:#ffffff;--surface-2:#f0f0f0;--surface-3:#e3e3e3;
+ --text:#17171b;--muted:#62626b;--line:#ececec;--outline:#d4d4d4;
+ --primary:#0066cc;--on-primary:#ffffff;--primary-soft:#e6efff;--on-primary-soft:#1f66db;
+ --ok:#18723c;--ok-soft:#dcf3e3;--warn:#925200;--warn-soft:#fff0d4;--err:#b42318;--err-soft:#fde5e3;
+ --seat:#e6efff;--on-seat:#1f66db;--seat-busy:#f2f2f2;--on-seat-busy:#73737c;
  --shadow:none;
  --shadow-up:0 -6px 24px rgb(0 0 0 / .08);
  --scrim:rgb(0 0 0 / .4);--bar:rgb(247 247 247 / .86);
@@ -15,28 +16,29 @@
  color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){
- --bg:#000000;--surface:#1a1a1a;--surface-2:#262626;--surface-3:#363636;
- --text:#f0f0f0;--muted:#9a9a9a;--line:#262626;--outline:#3d3d3d;
- --primary:#4c93ff;--on-primary:#ffffff;--primary-soft:#14284a;--on-primary-soft:#94bdff;
+ --bg:#111114;--surface:#1c1c21;--surface-2:#262626;--surface-3:#363636;
+ --text:#f5f5f7;--muted:#a8a8b2;--line:#262626;--outline:#3d3d3d;
+ --primary:#5aa8ff;--on-primary:#0b0b0f;--primary-soft:#14284a;--on-primary-soft:#94bdff;
  --ok:#4cc77a;--ok-soft:#12301d;--warn:#ffb340;--warn-soft:#3a2a0d;--err:#ff6b61;--err-soft:#3d1513;
- --seat:#16294a;--on-seat:#a9c9ff;--seat-busy:#1f1f1f;--on-seat-busy:#5c5c5c;
+ --seat:#16294a;--on-seat:#a9c9ff;--seat-busy:#1f1f1f;--on-seat-busy:#a8a8b2;
  --shadow:none;--shadow-up:0 -6px 24px rgb(0 0 0 / .6);--scrim:rgb(0 0 0 / .6);--bar:rgb(0 0 0 / .82);
  color-scheme:dark;
 }}
 :root[data-theme=dark]{
- --bg:#000000;--surface:#1a1a1a;--surface-2:#262626;--surface-3:#363636;
- --text:#f0f0f0;--muted:#9a9a9a;--line:#262626;--outline:#3d3d3d;
- --primary:#4c93ff;--on-primary:#ffffff;--primary-soft:#14284a;--on-primary-soft:#94bdff;
+ --bg:#111114;--surface:#1c1c21;--surface-2:#262626;--surface-3:#363636;
+ --text:#f5f5f7;--muted:#a8a8b2;--line:#262626;--outline:#3d3d3d;
+ --primary:#5aa8ff;--on-primary:#0b0b0f;--primary-soft:#14284a;--on-primary-soft:#94bdff;
  --ok:#4cc77a;--ok-soft:#12301d;--warn:#ffb340;--warn-soft:#3a2a0d;--err:#ff6b61;--err-soft:#3d1513;
- --seat:#16294a;--on-seat:#a9c9ff;--seat-busy:#1f1f1f;--on-seat-busy:#5c5c5c;
+ --seat:#16294a;--on-seat:#a9c9ff;--seat-busy:#1f1f1f;--on-seat-busy:#a8a8b2;
  --shadow:none;--shadow-up:0 -6px 24px rgb(0 0 0 / .6);--scrim:rgb(0 0 0 / .6);--bar:rgb(0 0 0 / .82);
  color-scheme:dark;
 }
 
 *,*:before,*:after{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
-body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC",sans-serif;overflow-wrap:anywhere}
+html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;background:var(--bg)}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC",sans-serif;overflow-wrap:anywhere}
 body:has(dialog[open]){overflow:hidden}
+body.modal-open{overflow:hidden}
 h1,h2,h3,p,ol,dl,dd,fieldset{margin:0}
 h1{font-size:26px;font-weight:650;letter-spacing:-.3px}
 h2{font-size:17px;font-weight:600}
@@ -46,7 +48,7 @@ button{cursor:pointer}
 button:disabled{cursor:default}
 :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .muted{color:var(--muted)}
-.small{font-size:13px}
+.small{font-size:14px}
 .hide{display:none!important}
 [hidden]{display:none!important}
 .icon{width:20px;height:20px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -63,15 +65,18 @@ button:disabled{cursor:default}
 .appbar.scrolled .page-name{opacity:1}
 .logo{display:none}
 .appbar-actions{display:flex;align-items:center;gap:2px}
-.account-chip{display:flex;align-items:center;gap:7px;max-width:170px;height:34px;padding:0 12px;border:0;border-radius:17px;background:var(--surface-2);font-size:13px;white-space:nowrap}
+.account-chip{display:flex;align-items:center;gap:7px;max-width:170px;min-height:34px;height:auto;padding:0 12px;border:0;border-radius:17px;background:var(--surface-2);font-size:13px;white-space:nowrap}
 .account-chip span:last-child{overflow:hidden;text-overflow:ellipsis}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--warn);flex-shrink:0}
 .dot.ok{background:var(--ok)}
 .progress{position:absolute;left:0;right:0;bottom:-1px;height:3px;overflow:hidden;background:var(--primary-soft)}
-.progress i{position:absolute;top:0;bottom:0;width:40%;background:var(--primary);animation:indeterminate 1.1s cubic-bezier(.4,0,.2,1) infinite}
-@keyframes indeterminate{from{left:-40%}to{left:100%}}
+.progress i{position:absolute;left:0;top:0;bottom:0;width:40%;background:var(--primary);animation:indeterminate 1.1s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes indeterminate{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
 
 /* ---------- 布局与导航 ---------- */
+#libraryDock{display:contents}
+
+html[data-page-hidden=true] *,html[data-page-hidden=true] *::before,html[data-page-hidden=true] *::after{animation-play-state:paused!important}
 .content{padding:8px 16px calc(var(--dock-h) + 28px);max-width:1120px;margin:0 auto;min-width:0}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line);padding:4px 4px calc(4px + var(--safe-b))}
 .nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:4px 0;border:0;background:none;color:var(--muted);font-size:12px}
@@ -83,11 +88,11 @@ button:disabled{cursor:default}
 .footer{display:none}
 
 /* ---------- 通用组件 ---------- */
-.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:2px 4px 14px}
-.page-head h1{font-size:30px;font-weight:700;letter-spacing:0;line-height:1.25}
+.page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin:2px 4px 14px}
+.page-head h1{font-size:30px;font-weight:700;letter-spacing:0;line-height:1.3}
 .page-head p{display:none;margin-top:4px}
 .page-head .actions{margin-top:0}
-.card{background:var(--surface);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card{background:var(--surface);border-radius:var(--radius-card);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
 .section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;margin:18px 4px 6px}
 .section-head h2{font-size:15px;color:var(--muted);font-weight:600}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 18px;border:0;border-radius:20px;font-size:14px;font-weight:600;white-space:nowrap;transition:background .15s,transform .15s,opacity .15s}
@@ -234,7 +239,7 @@ progress::-moz-progress-bar{background:var(--primary)}
 .task .actions{margin-top:10px}
 .duo{border-left:4px solid var(--primary)}
 .record{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-top:1px solid var(--line)}
-.list-head+.record{border-top:0}
+.list-head+.record,.list-card>.record:first-child{border-top:0}
 .record div{min-width:0}
 .record strong{display:block;font-weight:600}
 .record .muted{font-size:13px}
@@ -261,8 +266,9 @@ progress::-moz-progress-bar{background:var(--primary)}
 .toggle .today:after{content:"";position:absolute;bottom:5px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:2px;background:currentColor;opacity:.7}
 .label-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .label-row .label{font-size:13px;color:var(--muted)}
-.query-summary{display:flex;align-items:center;gap:12px;padding:14px 12px 14px 16px}
-.query-summary>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.query-summary{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 12px 14px 16px}
+.query-summary>div{flex:1 1 8em;min-width:0;display:flex;flex-direction:column;gap:2px}
+.query-summary>.btn{max-width:100%;margin-left:auto;white-space:normal}
 .label-row .btn.text{min-height:28px;font-size:13px;padding:0 4px}
 .room-row{display:flex;align-items:center;gap:8px;padding:10px 8px 10px 16px;border-top:1px solid var(--line)}
 .room-main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -281,11 +287,12 @@ progress::-moz-progress-bar{background:var(--primary)}
 .pass-booking{display:flex;flex-direction:column;gap:2px;max-width:320px;margin:18px auto 4px;padding:12px 16px;border-radius:16px;background:var(--surface-2)}
 
 /* ---------- 弹层（手机为底部面板） ---------- */
-dialog{width:calc(100% - 20px);max-width:100%;max-height:90vh;margin:auto auto 10px;padding:0;border:0;border-radius:30px;background:var(--surface);color:var(--text);box-shadow:var(--shadow-up);overflow:auto;overscroll-behavior:contain}
+dialog{width:calc(100% - 20px);max-width:100%;max-height:90vh;margin:auto auto 10px;padding:0;border:0;border-radius:var(--radius-sheet);background:var(--surface);color:var(--text);box-shadow:var(--shadow-up);overflow:auto;overscroll-behavior:contain}
 dialog::backdrop{background:var(--scrim)}
 .sheet:focus{outline:none}
 .sheet{position:relative;padding:10px 20px 20px}
-.sheet-handle{width:36px;height:4px;margin:0 auto 14px;border-radius:2px;background:var(--outline)}
+.sheet-handle{position:sticky;top:0;z-index:2;width:36px;height:4px;margin:0 auto 14px;border-radius:2px;background:var(--outline);touch-action:none}
+.sheet-handle::before{content:"";position:absolute;inset:-14px -18px}
 .sheet-close{position:absolute;top:8px;right:8px}
 .sheet h2{font-size:20px;margin:0 40px 14px 0}
 .sheet h3{margin:18px 0 10px}
@@ -298,23 +305,30 @@ dialog::backdrop{background:var(--scrim)}
 .conn-list{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;border-radius:16px;background:var(--surface-2);padding:4px 0}
 .conn-list .btn.tonal{background:var(--surface)}
 .switch-row{display:flex;align-items:center;gap:12px;padding:12px 14px 12px 16px;margin-bottom:8px;border-radius:16px;background:var(--surface-2);cursor:pointer}
-.switch-row>span{flex:1;display:flex;flex-direction:column;gap:2px}
+.switch-row>span{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .switch{-webkit-appearance:none;appearance:none;position:relative;flex-shrink:0;width:50px;height:30px;margin:0;border-radius:15px;background:var(--surface-3);cursor:pointer;transition:background .2s}
 .switch:before{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / .25);transition:transform .3s var(--spring)}
 .switch:checked{background:var(--primary)}
 .switch:checked:before{transform:translateX(20px)}
-.conn-row{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px}
-.conn-row>div{flex:1;display:flex;flex-direction:column}
+.conn-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 12px 10px 16px}
+.conn-row>div{flex:1 1 7em;flex-basis:min(7em,calc(100% - 20px));min-width:0;display:flex;flex-direction:column}
+.conn-row>.btn{flex:0 1 auto;max-width:100%;margin-left:auto;white-space:normal;text-align:center}
 .conn-row .muted{font-size:13px}
-.seg-group{border:0;padding:0;margin:0 0 16px}
+.seg-group{min-width:0;border:0;padding:0;margin:0 0 16px}
 .seg-group legend{padding:0;margin-bottom:8px;font-size:13px;color:var(--muted)}
-.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;padding:3px;border-radius:16px;background:var(--surface-2)}
-.seg label{position:relative}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;padding:3px;border-radius:16px;background:var(--surface-2)}
+.seg label{position:relative;display:grid;min-width:0}
 .seg input{position:absolute;opacity:0;width:1px;height:1px}
-.seg span{display:grid;place-items:center;min-height:36px;padding:0 8px;border-radius:13px;font-size:14px;color:var(--muted)}
+.seg span{display:grid;place-items:center;min-width:0;min-height:36px;padding:6px 8px;border-radius:13px;font-size:14px;line-height:1.35;text-align:center;color:var(--muted)}
 .seg input:checked+span{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .seg input:focus-visible+span{outline:2px solid var(--primary);outline-offset:-2px}
 .seg-group>p+p{margin-top:8px}
+/* 设置中的独立分段控件和离线操作分别占据自己的垂直空间。 */
+#settingsForm .seg-group>.seg+.seg{margin-top:12px}
+/* 大字号下较长的画质标签按内容分配空间；其余分组保持原有等宽布局。 */
+#settingsForm .seg:has(input[name=quality]){grid-auto-columns:auto}
+#settingsForm .seg-group>.seg+p{margin-top:8px}
+#settingsForm #offlineStatus+.actions{margin:10px 0 12px}
 .about{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
 .progress-steps{list-style:none;padding:0;margin:4px 0 14px}
 .progress-steps li{display:flex;align-items:center;gap:12px;padding:8px 0;color:var(--muted)}
@@ -366,7 +380,7 @@ dialog::backdrop{background:var(--scrim)}
 .chip-sep{flex:0 0 1px;align-self:center;height:20px;margin:0 2px;background:var(--outline)}
 .area-tools .search input{background:var(--surface)}
 .loader{position:relative;height:4px;max-width:220px;margin:6px auto 4px;border-radius:2px;background:var(--surface-2);overflow:hidden}
-.loader i{position:absolute;top:0;bottom:0;width:40%;border-radius:2px;background:var(--primary);animation:indeterminate 1.1s cubic-bezier(.4,0,.2,1) infinite}
+.loader i{position:absolute;left:0;top:0;bottom:0;width:40%;border-radius:2px;background:var(--primary);animation:indeterminate 1.1s cubic-bezier(.4,0,.2,1) infinite}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .card-head .icon{width:18px;height:18px}
 .profile-top{display:flex;align-items:center;gap:12px;margin:-2px -8px 12px 0}
@@ -472,23 +486,28 @@ dialog::backdrop{background:var(--scrim)}
  html:not([data-motion=off]) .room-form.appear{animation:rise .24s var(--ease-out)}
  /* 按下时轻轻缩一下 */
  /* 按下：手指一碰就缩小（脚本加 .pressing），松手由脚本按弹簧弹回 */
- html:not([data-motion=off]) .pressing:not(.seg > label):not(.swatch),html:not([data-motion=off]) :is(.seg > label,.swatch).pressing>span{transform:scale(.94);transition:transform .1s cubic-bezier(.2,0,0,1)}
+ html:not([data-motion=off]) .pressing:not(.seg > label):not(.swatch){opacity:.78;transition:opacity .08s ease-out}
+ html:not([data-motion=off]) :is(.seg > label,.swatch).pressing>span{transform:scale(.94);transition:transform .1s cubic-bezier(.2,0,0,1)}
  html:not([data-motion=off]) .nav button.pressing .icon{transform:scale(.86)}
  html:not([data-motion=off]) dialog[open]{animation:sheet-in .36s var(--spring)}
  html:not([data-motion=off]) .toast:not(.hide){animation:pop-in .36s var(--spring)}
 }
 html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:after{animation-duration:.001s!important;animation-iteration-count:1!important;transition:none!important}
-@media (prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important}.first-show{animation:none}}
 
 /* ---------- 窄屏细节 ---------- */
 @media (max-width:719px){
+ /* Center the normal title; only measured crowding switches to the remaining left column. */
+ .appbar.compact-title .brand{flex:1;min-width:0;margin-right:12px}
+ .appbar.compact-title .page-name{position:static;display:block;flex:1;min-width:0;text-align:left}
+ .appbar.compact-title .appbar-actions{flex-shrink:0}
  body.typing .nav,body.typing .lib-side{display:none}
  .sel-panel.empty{display:none}
  .wide-only{display:none}
  .seat-head .btn.sm{padding:0 8px}
- .dialog-actions{flex-wrap:nowrap}
+ .dialog-actions{flex-wrap:wrap}
  .dialog-actions .spacer{display:none}
- .dialog-actions .btn{flex:1 1 0;min-height:48px;border-radius:24px;padding:0 12px}
+ .dialog-actions .btn{flex:1 1 8em;max-width:100%;min-height:48px;border-radius:24px;padding:8px 12px;white-space:normal;line-height:1.4}
  .dialog-actions .btn.text{background:var(--surface-2);color:var(--text)}
  .dialog-actions .btn.text.danger{color:var(--err)}
 }
@@ -522,8 +541,8 @@ html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:a
  .page-head h1{font-size:26px}
  .page-head p{display:block}
  .footer{display:flex;justify-content:space-between;gap:12px;padding:10px 22px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
- .lib{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
- .lib-side{position:sticky;top:calc(var(--appbar-h) + 20px);z-index:auto}
+ .lib{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
+ .lib-side{position:static;min-width:0;z-index:auto}
  .sel-panel{border-radius:20px;border:0;box-shadow:var(--shadow);padding:16px}
  .sel-title{display:block;margin-bottom:10px}
  .sel-row{align-items:flex-start}
@@ -546,22 +565,27 @@ html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:a
 .btn.danger.filled{background:var(--err);color:#fff}
 .btn.text.danger,.current .btn.text.danger{color:var(--err)}
 .upcoming .record{padding:10px 8px 10px 16px}
-.room-find .find-row{display:flex;gap:8px;align-items:center}
-.room-find input{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--outline);background:var(--surface-2);color:var(--text);padding:0 12px;font:inherit}
+.room-find .find-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.room-find input{flex:1 1 9em;min-width:0;max-width:100%;min-height:44px;height:auto;border-radius:12px;border:1px solid var(--outline);background:var(--surface-2);color:var(--text);padding:8px 12px;font:inherit}
+.room-find .find-row>.btn{max-width:100%;margin-left:auto;white-space:normal}
 .room-find p{margin:8px 0 0}
-.room-find .room-date{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--muted);font-size:13px}.room-find .room-date input{height:40px}
+.room-find .room-date{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;color:var(--muted);font-size:13px}.room-find .room-date>span{flex:none}.room-find .room-date input{flex-basis:12em;min-height:40px;height:auto}
 button.room-main{background:none;border:0;padding:4px 0;margin:0;text-align:left;color:inherit;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#roomResults div.room-main{padding:4px 0}
 .day-nav{display:flex;align-items:center;gap:8px;margin:4px 0 14px}
 .day-nav>div{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center}
 .room-day{padding:12px 0;border-top:1px solid var(--line)}
 .room-day:first-of-type{border-top:0}
 .room-day-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .room-day-head .badge{margin-left:auto}
-.timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(22px,1fr));gap:3px}
+.timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(32px,1fr));gap:8px}
+@media(max-width:719px){.timeline{grid-template-columns:repeat(6,minmax(0,1fr))}}
 .slot{display:flex;align-items:center;justify-content:center;height:30px;border-radius:7px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.timeline .slot{height:auto;min-height:32px;padding:5px 2px;line-height:1.3;white-space:nowrap}
 .slot.free{background:var(--ok-soft);color:var(--ok)}
 .slot.borrowed{background:var(--warn-soft);color:var(--warn)}
 .slot.busy{background:var(--surface-3);color:var(--muted)}
+.slot.unknown{background:repeating-linear-gradient(135deg,var(--surface-2) 0 4px,var(--outline) 4px 5px);color:var(--muted);border:1px dashed var(--muted)}
 .room-day p{margin:8px 0 0}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:10px 0 4px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
@@ -620,8 +644,9 @@ button.room-main{background:none;border:0;padding:4px 0;margin:0;text-align:left
 .legal p{font-size:13.5px;line-height:1.65;margin:0 0 6px;color:var(--text)}
 
 /* 离线空教室 */
-.offline-card{display:flex;align-items:center;gap:12px;padding:14px 12px 14px 16px}
-.offline-card>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.offline-card{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 12px 14px 16px}
+.offline-card>div{flex:1 1 10em;min-width:0;display:flex;flex-direction:column;gap:2px}
+.offline-card>.btn,.offline-card>span{max-width:100%;margin-left:auto;white-space:normal}
 .room-results>.banner{margin:0 16px 8px}
 /* 条件改了但还没重查时，旧结果变淡。
    不用 content-visibility:auto：重画后新元素按估计高度（76px，实际 91px）排版，滚到下面再点筛选，整页会跳 */
@@ -640,7 +665,9 @@ button.room-main{background:none;border:0;padding:4px 0;margin:0;text-align:left
 .achv-near{margin:6px 0 0}.achv-near b{color:var(--primary)}.achv-detail{text-align:center;margin-bottom:12px}
 /* 居中排版的弹窗标题：左右各留出关闭按钮的位置，标题才在正中 */
 .sheet :is(.achv-detail,.celebrate,.empty,.center,.hero) h2{margin-left:40px;margin-right:40px}
-.record.dim{opacity:.5}
+/* 结束/取消以次要文字表达层级，保留整行文字与分隔线的可读性。 */
+.record.dim:not(.working){opacity:1;color:var(--muted)}
+.record.dim strong{font-weight:500}
 .full-hint{flex-direction:column;align-items:flex-start;gap:8px;margin:0 0 10px}.full-hint .chip-row{flex-wrap:wrap}
 .periods .toggle span{flex-direction:column;line-height:1.15}.periods .toggle small{font-size:10px;font-weight:400;opacity:.65;font-variant-numeric:tabular-nums}
 .week-form{display:flex;align-items:flex-end;gap:10px;margin:8px 0 16px}.week-form .field{flex:1;margin:0}.week-form>span{padding-bottom:12px}
@@ -693,7 +720,8 @@ html[data-platform=android] .nav [data-page=tasks],html[data-platform=windows] .
 }
 /* 第一次出现的卡片、提示升起淡入；不会被整页重画替换的控件（设置里的分段选择、按下态）用 CSS 过渡 */
 html:not([data-motion=off]) .first-show{animation:rise .32s var(--ease-out) both}
-.seg span,.chip,.icon-btn,.area-row,.room-row,.record{transition:background-color .2s,color .2s,box-shadow .2s,transform .15s}
+.seg span{transition:background-color .2s,color .2s,box-shadow .2s}
+.chip,.icon-btn,.area-row,.room-row,.record{transition:background-color .2s,color .2s,box-shadow .2s,transform .15s}
 /* 选中高亮滑过去时的那块影子：垫在按钮文字下面 */
 /* 0.9.27 手机：弹窗下拉关闭、遮罩淡入；当前预约按钮分主次两行；座位页标题不折行 */
 dialog::backdrop{opacity:var(--scrim-o,1)}
@@ -707,18 +735,20 @@ html:not([data-motion=off]) dialog[open]:not(.closing)::backdrop{animation:fade-
  .seat-head .btn.sm[data-action=seatMap]{width:40px;min-height:40px;padding:0;border-radius:20px;background:transparent;color:var(--muted)}
 }
 .slide-ghost{position:absolute;left:0;top:0;z-index:0;pointer-events:none}.seg label,.chip-row>.chip{position:relative}.seg label>span,.chip-row>.chip{z-index:1}
-/* 考试安排：左边日期块，右边科目、时间、考场；已结束的变淡 */
-.exams-card .chip-row{margin:2px 0 10px}
+/* 考试安排：正常宽度并排；内容/字号不足以并排时自然分行，不压缩正文。 */
+.exam-term{position:relative;display:block;margin:0 2px 8px;padding-left:22px;line-height:1.5;font-weight:600}.exam-term .icon{position:absolute;left:0;top:calc(.75em - 8px);width:16px;height:16px;color:var(--primary)}
 .exam-list{display:flex;flex-direction:column;gap:8px;margin:4px 0 8px}
-.exam-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px;border:0;border-radius:16px;background:var(--surface-2);color:var(--text);text-align:left}
-.exam-row.past{opacity:.55}
-.exam-row>.icon{width:18px;height:18px;color:var(--muted);flex:none}
+.exam-row{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:12px;width:100%;padding:12px 42px 12px 12px;border:0;border-radius:16px;background:var(--surface-2);color:var(--text);text-align:left}
+.exam-row.past{opacity:1;color:var(--muted)}
+.exam-row.past .exam-main strong{font-weight:500}
+.exam-actions:empty,.exam-status:empty{display:none}
+.exam-row>.icon{position:absolute;right:12px;top:calc(12px + .75em);transform:translateY(-50%);width:18px;height:18px;color:var(--muted);flex:none}
 .exam-date{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:56px;padding:6px 4px;border-radius:12px;background:var(--primary-soft);color:var(--on-primary-soft)}
-.exam-date b{font-size:17px;font-variant-numeric:tabular-nums}.exam-date small{font-size:11px;opacity:.8}
-.exam-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.exam-date b{font-size:17px;font-variant-numeric:tabular-nums}.exam-date small{font-size:11px}
+.exam-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 10em}
 .exam-main strong{font-size:16px;line-height:1.3}
-.exam-line{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:13px;min-width:0}
-.exam-line .icon{width:14px;height:14px;flex:none}
+.exam-line{position:relative;display:block;padding-left:19px;color:var(--muted);font-size:13px;line-height:1.5;min-width:0}
+.exam-line .icon{position:absolute;left:0;top:calc(.75em - 7px);width:14px;height:14px;flex:none}
 .exam-line .badge{margin-left:4px;font-style:normal}
 .exam-note{display:flex;gap:6px;align-items:flex-start;margin:8px 0 0}.exam-note .icon{width:15px;height:15px;flex:none;margin-top:2px;color:var(--warn,#c88a00)}
 .exam-at{margin:4px 0 0}
@@ -735,4 +765,79 @@ html[data-platform=windows] .nav [data-page=exams]{display:none}
  .nav [data-page=pass] .icon{width:24px;height:24px;stroke-width:2.2}
  .nav.dragging [data-page=pass].lens .icon{transform:scale(1.12)}
  .nav-pill.on-pass{opacity:0}
+.nav.dragging .nav-pill.on-pass{opacity:1}
 }
+
+.slot.now{outline:2px solid var(--primary);outline-offset:-2px;font-weight:700}.slot.past{opacity:.5}
+.exam-history>summary{cursor:pointer;padding:10px 2px}.exam-type{margin-left:8px;font-size:11px;vertical-align:middle;font-weight:500}
+.toast{touch-action:pan-y}
+
+/* 设置：标题与关闭入口固定，长表单只滚动正文，减少动画不改变操作出口。 */
+dialog[data-kind=settings]{overflow:hidden;max-height:90vh;max-height:90dvh}
+.sheet-settings{display:flex;flex-direction:column;padding:0;max-height:inherit}
+.sheet-header{position:relative;flex:none;padding:10px 20px 14px;background:var(--surface);z-index:2}
+.sheet-header h2{margin-bottom:0}
+.sheet-settings .sheet-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 20px 20px}
+/* 放在全部装饰性规则之后，同时覆盖更高优先级的入场和遮罩；JS 动画由 settleMotion 收尾。 */
+html[data-motion=off],html[data-motion=off] *,html[data-motion=off] *::before,html[data-motion=off] *::after,html[data-motion=off] dialog::backdrop{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media (prefers-reduced-motion:reduce){html,html *,html *::before,html *::after,html dialog::backdrop{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* 紧凑筛选、标题工具和账户入口沿用组件尺寸；主操作、输入框和座位保留各自的 48px 目标。 */
+html[data-quality=economy] :is(.fresh .room-row,.fresh .area-row,.card.appear){animation:none!important}
+@media(prefers-contrast:more){.card,.chip,.field input,.field select{outline:1px solid var(--muted)}.nav,.appbar{background:var(--bg)!important;backdrop-filter:none!important}}
+
+.sheet-handle,.sheet-header .sheet-handle{position:relative;width:80px;height:32px;margin:0 auto 8px;background:none;border-radius:0;touch-action:none;cursor:grab}
+.sheet-handle::after{content:"";position:absolute;left:22px;right:22px;top:14px;height:4px;border-radius:2px;background:var(--outline)}
+dialog.dragging::backdrop{transition:none}dialog.closing-drag::backdrop{opacity:0;transition:opacity .22s}
+
+@media(max-width:719px){.nav [data-page=pass]{color:var(--muted);font-weight:400}.nav [data-page=pass][aria-current=page]{color:var(--primary);font-weight:600}.nav [data-page=pass] .ic{width:56px;height:30px;margin-top:0;border-radius:15px;background:none!important;color:inherit;box-shadow:none}.nav [data-page=pass] .icon{width:22px;height:22px;stroke-width:1.8}.nav [data-page=pass][aria-current=page] .icon{stroke-width:2.2}.nav-pill.on-pass{opacity:1}}
+
+.exam-row.next{border-color:var(--primary);background:var(--primary-soft)}
+.exam-changes{margin:12px 0;padding:12px;border:1px solid var(--outline);border-radius:var(--radius-control)}.exam-changes summary{cursor:pointer;font-weight:600}.exam-changes>div{margin-top:12px}.exam-changes p{margin:4px 0;overflow-wrap:anywhere}
+
+/* 保留原生滚动及捏合缩放；按钮点按不等待双击缩放识别。 */
+button,a,input,select,textarea,label{touch-action:manipulation}
+.sheet-handle{touch-action:none}
+
+/* 再交付版：有限宽度与真实字号决定换行；不缩小用户字号或重建控件。 */
+.dialog-actions>.btn{max-width:100%;white-space:normal}
+.query-summary .nw{display:inline-block;max-width:100%;white-space:normal}
+.exam-actions{flex-wrap:wrap}
+.exam-actions>.btn{max-width:100%;white-space:normal;flex:1 1 10em}
+.exam-date{max-width:100%}
+.exam-type{max-width:100%;white-space:normal}
+.quote .src,.account-card small,.chip.on .muted,.chip.quick .muted{opacity:1}
+.record.dim .badge{color:var(--muted)}
+/* 中等宽度也使用一列；只有容器足够宽时才展示独立的已选面板侧栏。 */
+@media (min-width:1100px){
+ .lib{grid-template-columns:minmax(0,1fr) 300px}
+ .lib-side{position:sticky;top:calc(var(--appbar-h) + 20px)}
+}
+/* 安全区在手机 dialog 的底部 margin 中计一次，正文不再重复添加。 */
+dialog,dialog[data-kind=settings]{
+ max-height:90vh;max-height:min(90vh,calc(100vh - 20px - var(--safe-b)));
+ max-height:min(90dvh,calc(100dvh - 20px - var(--safe-b)));
+}
+@media (forced-colors:active){
+ .card,.nav,.sheet,.exam-row,.conn-list{border:1px solid CanvasText}
+ .chip.on,.nav button[aria-current=page],.seg input:checked+span,.seat.sel{outline:2px solid Highlight;outline-offset:-2px}
+ .slot.now{outline-color:Highlight}
+ .switch{appearance:auto;width:24px;height:24px}
+ .switch:before{display:none}
+}
+
+/* 再交付版：普通弹层统一固定头部，只有正文滚动；关闭与标题保持可达。 */
+dialog.sheet-managed{overflow:hidden}
+.sheet{display:flex;flex-direction:column;min-height:0;max-height:inherit;padding:0;overflow:hidden}
+.sheet-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 20px 20px}
+.sheet-body>form{min-width:0}
+@media (min-width:720px){
+ .sheet-header{padding:22px 24px 14px}
+ .sheet-body,.sheet-settings .sheet-body{padding:0 24px 24px}
+}
+
+/* R3 reissue: one owner for the dialog root; CSS only interpolates the scrim. */
+html:not([data-motion=off]) dialog.sheet-managed[open],html:not([data-motion=off]) dialog.sheet-managed[open].closing{animation:none!important}
+html:not([data-motion=off]) dialog.sheet-managed[open]::backdrop{animation:none!important;opacity:var(--scrim-o,1);transition:opacity .22s var(--ease-out)}
+html:not([data-motion=off]) dialog.sheet-managed[open].dragging::backdrop{transition:none}
+.sheet-body>p{margin-bottom:10px}

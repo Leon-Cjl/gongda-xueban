@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light dark"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><title>工大学伴</title><link rel="stylesheet" href="styles.css"><link rel="preload" href="edition.js" as="script"><link rel="preload" href="legal.js" as="script"><link rel="preload" href="core.js" as="script"><link rel="preload" href="ui.js" as="script"><script src="boot.js"></script></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light dark"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><title>工大学伴</title><link rel="stylesheet" href="styles.css"><link rel="preload" href="edition.js" as="script"><link rel="preload" href="legal.js" as="script"><link rel="preload" href="core.js" as="script"><link rel="preload" href="read-queue.js" as="script"><link rel="preload" href="exams.js" as="script"><link rel="preload" href="toast.js" as="script"><link rel="preload" href="ui.js" as="script"><script src="boot.js"></script></head>
 <body>
 <header class="appbar" id="appbar">
  <div class="brand"><img class="logo" src="brand-mark.png" alt="" width="28" height="28"><span class="brand-name">工大学伴</span><span class="page-name" id="pageTitle">图书馆</span></div>
@@ -18,10 +18,10 @@
   <button data-page="exams"><span class="ic"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M8 3.5v3M16 3.5v3M4 10h16"/><path d="m9 15 2 2 4-4"/></svg></span><span>考试</span></button>
   <button data-page="me"><span class="ic"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 20c.9-3.8 3.7-5.8 7.2-5.8s6.3 2 7.2 5.8"/></svg><i class="nav-badge" data-for="me" hidden></i></span><span>我的</span></button>
  </nav>
- <main class="content" id="content"></main>
+ <main class="content" id="content"></main><div id="libraryDock"></div>
 </div>
-<footer class="footer"><span id="platform">正在连接客户端…</span><span>工大学伴 1.1.22</span></footer>
+<footer class="footer"><span id="platform">正在连接客户端…</span><span>工大学伴 1.1.26</span></footer>
 <dialog id="dialog"></dialog>
 <div id="toast" class="toast hide" role="status" aria-live="polite" popover="manual"></div>
-<script src="edition.js"></script><script src="legal.js"></script><script src="core.js"></script><script src="ui.js"></script>
+<script src="edition.js"></script><script src="legal.js"></script><script src="core.js"></script><script src="read-queue.js"></script><script src="exams.js"></script><script src="toast.js"></script><script src="operations.js"></script><script src="room-coverage.js"></script><script src="motion.js"></script><script src="diagnostics.js"></script><script src="ui.js"></script>
 </body></html>

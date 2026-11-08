@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import sys
 
 root = Path(__file__).resolve().parents[1]
-app = root / 'app'
+app = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else root / 'app'
 mock = root / 'tests' / 'mock-android.js'
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8769
 
@@ -27,6 +27,7 @@ class Handler(SimpleHTTPRequestHandler):
             html = (app / 'index.html').read_text(encoding='utf-8')
             html = html.replace('<script src="core.js">', '<script src="mock-android.js"></script><script src="core.js">', 1)
             if 'acceptance=1' in self.path:
+                html = html.replace('<head>', '<head><script src="qa-clock.js"></script>', 1)
                 html = html.replace('<script src="ui.js"></script>', '<script src="ui.js"></script><script src="phone-acceptance.js"></script>', 1)
             return self._send(html.encode('utf-8'), 'text/html; charset=utf-8')
         if path == '/frame.html':
@@ -39,7 +40,7 @@ class Handler(SimpleHTTPRequestHandler):
             # 奶蛙版等分支的界面目录里自带收款码；没有时用发布版的。
             own = app / 'donate.png'
             return self._send((own if own.exists() else root / 'android' / 'public' / 'donate.png').read_bytes(), 'image/png')
-        if path in ('/mock-android.js', '/phone-acceptance.js'):
+        if path in ('/mock-android.js', '/phone-acceptance.js', '/qa-clock.js'):
             return self._send((root / 'tests' / path[1:]).read_bytes(), 'text/javascript; charset=utf-8')
         return super().do_GET()
 

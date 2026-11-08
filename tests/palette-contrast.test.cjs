@@ -1,0 +1,2 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');const {accentPalette,contrastRatio}=require('../app/core.js');
+for(const base of ['#0066CC','#00A1B5','#18A957','#7B5CF5','#FF7A1A','#EE4C86','#E5484D','#5B6573'])for(const dark of [false,true])test(base+' '+(dark?'dark':'light')+' keeps actual button and state text readable',()=>{const p=accentPalette(base,dark);for(const [fg,bg] of [[p.onPrimary,p.primary],[p.onSoft,p.soft],[p.onSeat,p.seat],[p.primary,dark?'#1c1c21':'#ffffff']])assert.ok(contrastRatio(fg,bg)>=4.5,fg+' on '+bg);});

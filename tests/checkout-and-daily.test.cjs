@@ -2,18 +2,19 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {agent,schoolDocument,response}=require('./helpers/agent-harness.cjs');
 const C=require('../app/core.js');
 // 结束使用：模拟学校响应，不连接学校。配置 notice.leave 控制学校是否开放签退。
-function checkoutFixture({leave=1,inSeat=true,stays=false,failVerify=false}={}){
+function checkoutFixture({leave=1,inSeat=true,stays=false,failVerify=false,missingRecord=false}={}){
  let ended=false;
  const row={id:'r-1',type:1,no:'118',flag_out:inSeat?1:0,flag_leave:0};
  const a=agent({fetcher:async path=>{
   if(path==='/v4/index/subscribe'){if(failVerify&&ended)return{ok:false,status:502,json:async()=>({})};return response(ended&&!stays?[]:[row]);}
   if(path==='/v4/index/peizhi')return response({notice:{leave,rightback:1}});
   if(path==='/v4/space/checkout'){ended=true;return response({});}
+  if(path==='/v4/member/seat')return response({data:ended&&!missingRecord?[{id:'r-1',status_name:'已结束'}]:[]});
   return response({});
  }});
  return{a,posts:()=>a.calls.filter(x=>x.path==='/v4/space/checkout').length};
 }
-test('checkout posts the reservation id once and verifies it left the current list',async()=>{
+test('checkout posts once and verifies disappearance plus an explicit ended record',async()=>{
  const {a,posts}=checkoutFixture();
  const r=await a.run('checkout',{id:'r-1'});
  assert.equal(r.data.verified,true);assert.equal(posts(),1);
@@ -26,6 +27,7 @@ test('checkout is never posted when the school has not opened it or the seat is 
 test('checkout reports uncertainty instead of retrying, and does not claim success while still listed',async()=>{
  const f=checkoutFixture({failVerify:true});const r=await f.a.run('checkout',{id:'r-1'});assert.equal(r.error.code,'UNCERTAIN');assert.equal(f.posts(),1);
  const g=checkoutFixture({stays:true});assert.equal((await g.a.run('checkout',{id:'r-1'})).data.verified,false);
+ const h=checkoutFixture({missingRecord:true});assert.equal((await h.a.run('checkout',{id:'r-1'})).data.verified,false);
 });
 test('current reservations expose the official checkout condition',async()=>{
  const {a}=checkoutFixture();const r=await a.run('current');assert.equal(r.data[0].canCheckout,true);

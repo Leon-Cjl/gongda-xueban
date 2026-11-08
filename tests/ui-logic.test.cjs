@@ -41,7 +41,7 @@ test('period text compresses consecutive periods',()=>{
 });
 test('accent palette derives light and dark variants and rejects bad input',()=>{
  const light=accentPalette('#FF7A1A',false),dark=accentPalette('#FF7A1A',true);
- assert.equal(light.primary,'#ff7a1a');assert.match(light.soft,/^#[0-9a-f]{6}$/);
- assert.notEqual(dark.primary,light.primary);assert.equal(dark.onPrimary,'#ffffff');
+ assert.match(light.primary,/^#[0-9a-f]{6}$/);assert.match(light.soft,/^#[0-9a-f]{6}$/);
+ assert.notEqual(dark.primary,light.primary);assert.equal(dark.onPrimary,'#0b0b0f');
  assert.throws(()=>accentPalette('orange',false));
 });

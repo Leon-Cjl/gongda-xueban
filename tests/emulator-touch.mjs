@@ -1,0 +1,30 @@
+import fs from 'node:fs';
+import {adb,pkg,connect,sleep,tap,point} from './emulator-driver.mjs';
+const output=process.argv[2],motionMode=process.argv[3]||'off';adb('shell','am','start','-S','-n',pkg+'/cn.qlucampus.personal.EmulatorActivity');const c=await connect('https://qa.campus.local/');
+const checks=[];
+const check=(yes,name)=>{if(!yes)throw Error(name);checks.push(name);};
+const wait=async expression=>{for(let i=0;i<60;i++){if(await c.evaluate(expression))return;await sleep(100);}throw Error('UI did not settle: '+expression);};
+try{
+ await wait('!!window.CampusRuntimeReady');
+ await c.evaluate(`window.__touchProbe=[];for(const type of ['pointerdown','pointerup','click'])document.addEventListener(type,e=>{if(type==='pointerdown')window.__downTarget=e.target.closest('button');__touchProbe.push({type,at:performance.now(),y:e.clientY,target:e.target.closest('button')?.dataset.action||e.target.className,open:document.querySelector('#dialog').open,same:e.target.closest('button')===window.__downTarget,connected:window.__downTarget?.isConnected});if(__touchProbe.length>30)__touchProbe.shift();},true);new MutationObserver(()=>{if(window.__downTarget&&!__downTarget.isConnected&&__downTarget.dataset.action==='account')__touchProbe.push({type:'account-node-removed',at:performance.now()})}).observe(document.querySelector('#content'),{childList:true,subtree:true});true`);
+ await tap(c,'.nav [data-page="me"]');await wait(`document.querySelector('#pageTitle').textContent==='我的'`);
+ check(true,'ADB tap switches the bottom navigation to My page');
+ await tap(c,'[data-action="settings"]');await wait(`document.querySelector('#dialog').open`);
+ await c.evaluate(`document.querySelector('#settingsForm input[name="motion"][value="${motionMode}"]').click();true`);
+ adb('shell','input','keyevent','4');await wait(`!document.querySelector('#dialog').open`);
+ check(await c.evaluate(`document.querySelector('#pageTitle').textContent==='我的'`),'Android Back closes the sheet and keeps the page');
+ await tap(c,'[data-action="settings"]');await wait(`document.querySelector('#dialog').open`);
+ const p=await point(c,'.sheet-handle');
+ adb('shell','input','swipe',String(p.x),String(p.y),String(p.x),String(p.y+900),'500');
+ await wait(`!document.querySelector('#dialog').open`);check(true,'ADB downward drag dismisses the settings sheet');
+ await tap(c,'#content [data-action="account"]');await wait(`!!document.querySelector('#password')`);
+ check(await c.evaluate('!document.querySelector(".ptr")'),'the first content tap opens its action without creating a pull-refresh overlay');
+ await tap(c,'#password');await sleep(800);
+ const keyboard=await c.evaluate(`(()=>{const e=document.querySelector('#password'),r=e.getBoundingClientRect();return {bottom:r.bottom,height:visualViewport.height,layoutHeight:innerHeight,focused:document.activeElement===e}})()`);
+ keyboard.imeReportedShown=/mInputShown=true/.test(adb('shell','dumpsys','input_method').toString());
+ check(keyboard.focused&&keyboard.bottom<=keyboard.height+2&&keyboard.imeReportedShown,'focused password field remains visible with the emulator’s current IME layout');
+ adb('shell','input','keyevent','4');await sleep(500);adb('shell','input','keyevent','4');await sleep(500);
+ check(!await c.evaluate(`document.querySelector('#dialog').open`),'Back exits input focus and closes the account sheet');
+ check(c.errors.length===0,'no JavaScript exceptions during native touch and Back interactions');
+ fs.writeFileSync(output,JSON.stringify({synthetic:true,motionMode,input:'ADB stationary touchscreen press 60 ms; separate from application animation duration',checks,keyboard,runtimeErrors:c.errors},null,2));console.log(JSON.stringify({ok:true,checks:checks.length,keyboard}));
+}catch(error){console.log(JSON.stringify(await c.evaluate('({probe:window.__touchProbe,dialog:document.querySelector("#dialog").open,active:document.activeElement?.id})')));throw error;}finally{c.close();}

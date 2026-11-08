@@ -30,8 +30,10 @@ function recordMatches(r,t,seat,loose=false){
  const id=r.space??r.seat_id??r.space_id;
  const begin=recordParts(r.beginTime??r.start_time??r.startTime,r.day??r.date??'');
  const end=recordParts(r.endTime??r.end_time,begin.day);
- const bad=(loose?/取消|撤销|失效/:/取消|违约|结束|失效/).test(String(r.status_name||'')+String(r.statusMsg||''));
- if(String(id)!==String(seat.id)||begin.day!==t.day||end.day!==t.day||bad)return false;
+ const bad=(loose?/取消|撤销|失效/:/取消|撤销|违约|结束|失效/).test(String(r.status_name||'')+String(r.statusMsg||''));
+ const status=String(r.status??''),label=String(r.status_name||'')+String(r.statusMsg||'');
+ const positive=loose?/预约成功|已预约|待签到|已签到|使用中|暂离|已完成|已结束|已签退|违约|未签到/.test(label)||['1','2','5','9'].includes(status):/预约成功|已预约|待签到|已签到|使用中|暂离/.test(label)||['2','9'].includes(status);
+ if(String(id)!==String(seat.id)||begin.day!==t.day||end.day!==t.day||bad||status==='4'||!loose&&status&&!['2','9'].includes(status)||!positive)return false;
  return !!begin.time&&!!end.time&&begin.time<=t.start&&end.time>=t.end;
 }
 // 学校针对账号的长期性拒绝（已有预约、违约受限、禁止、权限等），用于提示文案。
@@ -132,11 +134,16 @@ function periodText(list){
  return out.join('、')||'—';
 }
 // 主题色：由一个基色推出浅色/深色模式下的强调色、浅底色和浅底上的文字色。
+function contrastRatio(a,b){
+ const luminance=hex=>{const n=parseInt(hex.replace('#',''),16),v=[n>>16&255,n>>8&255,n&255].map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2];};
+ const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);
+}
 function accentPalette(base,dark){
  if(!/^#?[0-9a-f]{6}$/i.test(String(base)))throw Error('主题色格式不正确');
  const n=parseInt(String(base).replace('#',''),16),c=[n>>16&255,n>>8&255,n&255],mix=(t,to)=>c.map(x=>Math.round(x+(to-x)*t)),hex=a=>'#'+a.map(x=>x.toString(16).padStart(2,'0')).join('');
- return dark?{primary:hex(mix(.15,255)),onPrimary:'#ffffff',soft:hex(mix(.72,0)),onSoft:hex(mix(.5,255)),seat:hex(mix(.7,0)),onSeat:hex(mix(.55,255))}
-  :{primary:hex(c),onPrimary:'#ffffff',soft:hex(mix(.88,255)),onSoft:hex(mix(.25,0)),seat:hex(mix(.88,255)),onSeat:hex(mix(.25,0))};
+ const readable=(background,start,to)=>{for(let t=start;t<=1.001;t+=.02){const color=hex(mix(Math.min(1,t),to));if(contrastRatio(color,background)>=4.5)return color;}return to===255?'#ffffff':'#000000';};
+ if(dark){const soft=hex(mix(.72,0)),seat=hex(mix(.7,0));return{primary:readable('#1c1c21',.15,255),onPrimary:'#0b0b0f',soft,onSoft:readable(soft,.5,255),seat,onSeat:readable(seat,.55,255)};}
+ const soft=hex(mix(.88,255));return{primary:readable('#ffffff',0,0),onPrimary:'#ffffff',soft,onSoft:readable(soft,.25,0),seat:soft,onSeat:readable(soft,.25,0)};
 }
 // ---------- 0.8：提醒、统计与筛选 ----------
 const clockText=ms=>dtf('en-GB',{timeZone:'Asia/Shanghai',hour12:false,hour:'2-digit',minute:'2-digit'}).format(new Date(ms));
@@ -229,7 +236,8 @@ function roomDay(periods=[],states={}){
  for(const p of v){const s=states[p]||'busy',last=out[out.length-1];if(last&&last.state===s&&last.to===p-1)last.to=p;else out.push({from:p,to:p,state:s});}
  // 文字只列空闲的节次，占用情况看上面的色块。
  const free=out.filter(x=>x.state==='free').map(x=>x.from===x.to?String(x.from):x.from+'–'+x.to);
- return{segments:out,text:free.length?'空闲：第 '+free.join('、')+' 节':'这一天没有空闲的节次',freeCount:v.filter(p=>(states[p]||'busy')==='free').length};
+ const unknown=v.filter(p=>states[p]==='unknown').length;
+ return{segments:out,text:(free.length?'空闲：第 '+free.join('、')+' 节':unknown?'尚未核验到空闲节次':'这一天没有空闲的节次')+(unknown?'；'+unknown+' 节尚未完整查询':''),freeCount:v.filter(p=>(states[p]||'busy')==='free').length,unknownCount:unknown};
 }
 // 教学周 + 星期 → 日期：以“今天是第 currentWeek 周”为基准推算。
 function weekDate(week,weekday,currentWeek,today=nowChina()){
@@ -246,13 +254,33 @@ function weekOf(day,currentWeek,today=nowChina()){
 }
 // 离线空教室：每天按节同步一次。rooms 是 [id,名称,教学楼,座位数]；days[日期].s 每间教室占 periods.length 个字符：0 有课或占用，1 空闲，2 空闲但有借用。
 function packRoomDay(rooms=[],periods=[],states=new Map()){return rooms.map(r=>{const m=states.get(String(r[0]))||{};return periods.map(p=>m[p]||'0').join('');}).join('');}
-// 某教学周某天在离线数据里的那一天：有就用；没有就用同一星期几里日期最近的一天按课表推算（approx）。
+// Release velocity uses only recent motion; holding still before lifting must not count as a fling.
+function gestureVelocity(samples=[],now=0,windowMs=80){
+ const points=samples.filter(x=>Number.isFinite(x[0])&&Number.isFinite(x[1])&&x[1]<=now&&now-x[1]<=windowMs);
+ if(points.length<2)return 0;
+ const first=points[0],last=points[points.length-1],dt=last[1]-first[1];
+ return dt>=8?(last[0]-first[0])/dt:0;
+}
+function sheetOffset(dy){return dy<0?-8*Math.log1p(-dy/8):Math.max(0,dy-8);}
+// Period times are read from school options, never inferred from the period number.
+function periodState(time,day,today,minutes){
+ if(day!==today)return '';
+ const m=String(time||'').match(/(\d{1,2}):(\d{2})\s*[-–—~至]\s*(\d{1,2}):(\d{2})/);
+ if(!m)return '';
+ const start=Number(m[1])*60+Number(m[2]),end=Number(m[3])*60+Number(m[4]);
+ if(Number(m[1])>23||Number(m[3])>23||Number(m[2])>59||Number(m[4])>59||end<=start)return '';
+ return minutes>=end?'past':minutes>=start?'now':'';
+}
+// 某教学周某天在离线数据里的那一天：有就用；没有则优先同一星期几、同单双周的最近样本，仍属推算（approx）。
 function offlineDay(data,week,weekday){
  if(!data?.days||!data.base)return null;
  const date=weekDate(week,weekday,data.base.week,data.base.day);
  if(data.days[date])return{date,source:date,approx:false,day:data.days[date]};
  const t=Date.parse(date+'T12:00:00+08:00'),same=Object.keys(data.days).filter(d=>(new Date(d+'T12:00:00+08:00').getUTCDay()||7)===Number(weekday)).sort((a,b)=>Math.abs(Date.parse(a+'T12:00:00+08:00')-t)-Math.abs(Date.parse(b+'T12:00:00+08:00')-t));
- return same.length?{date,source:same[0],approx:true,day:data.days[same[0]]}:null;
+ // Prefer a sample from the same odd/even teaching week, then choose the closest date.
+ const sourceWeek=d=>Number.isInteger(Number(data.days[d].week))?Number(data.days[d].week):weekOf(d,data.base.week,data.base.day);
+ same.sort((a,b)=>Number(Math.abs(Number(week)-sourceWeek(a))%2!==0)-Number(Math.abs(Number(week)-sourceWeek(b))%2!==0)||Math.abs(Date.parse(a+'T12:00:00+08:00')-t)-Math.abs(Date.parse(b+'T12:00:00+08:00')-t));
+ return same.length?{date,source:same[0],approx:true,parityMismatch:Math.abs(Number(week)-sourceWeek(same[0]))%2!==0,day:data.days[same[0]]}:null;
 }
 const buildingKey=x=>String(x||'').toLowerCase().replace(/[\s\-_·.#（）()]/g,'').replace(/教学楼|教学|楼$/g,'');
 function sameBuilding(a,b){if(String(a)===String(b))return true;const x=buildingKey(a);return !!x&&x===buildingKey(b);}
@@ -270,7 +298,7 @@ function offlineRooms(data,{building='',name='',week,weekday,periods=[]}={}){
   rooms.push({id:r[0],name:r[1],building:r[2],campus:data.campusName||data.campusLabel||'',capacity:r[3],reserved});
   if(!reserved){let reached=last;for(const p of P.filter(p=>p>last)){if(st(p)!=='1')break;reached=p;}final[String(r[0])]=reached;}
  });
- return{date:hit.date,source:hit.source,approx:hit.approx,at:hit.day.at,rooms,until:{final,last:P[n-1]??last,done:true},anyBuilding:!!label&&!known};
+ return{date:hit.date,source:hit.source,approx:hit.approx,parityMismatch:!!hit.parityMismatch,at:hit.day.at,rooms,until:{final,last:P[n-1]??last,done:true},anyBuilding:!!label&&!known};
 }
 // 离线“看全天”：一次算出名称匹配（或指定 id）的教室在这一天每一节的状态，不用逐节查。
 function offlineRoomDay(data,{name='',exactId='',week,weekday}={}){
@@ -281,7 +309,7 @@ function offlineRoomDay(data,{name='',exactId='',week,weekday}={}){
   const states={};P.forEach((p,j)=>{const c=s[i*n+j];if(c==='1')states[p]='free';else if(c==='2')states[p]='borrowed';});
   rooms.push({id:r[0],name:r[1],building:r[2],campus:data.campusName||data.campusLabel||'',capacity:r[3],states});
  });
- return{date:hit.date,source:hit.source,approx:hit.approx,at:hit.day.at,periods:P,rooms};
+ return{date:hit.date,source:hit.source,approx:hit.approx,parityMismatch:!!hit.parityMismatch,at:hit.day.at,periods:P,rooms};
 }
 // 副本过了几天（按北京时间的日期算）；超过 staleDays 天提醒重新查询。
 function cacheAge(at,now=Date.now(),staleDays=3){const days=Math.floor((Date.parse(chinaDay(now)+'T00:00:00+08:00')-Date.parse(chinaDay(at)+'T00:00:00+08:00'))/86400000);return{days:Number.isFinite(days)?days:0,stale:Number.isFinite(days)&&days>=staleDays};}
@@ -346,5 +374,5 @@ function seatVisits(records=[],no,area='',now=Date.now(),today=nowChina()){
  return usedVisits(records,now,today).filter(x=>x.seat===String(no)&&(!a||!x.area||x.area===a||x.area.includes(a)||a.includes(x.area))).length;
 }
 const chinaDay=ms=>dtf('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date(ms));
-const exports={NEGATIVE_STATUS,mergeVisitLog,ACHIEVEMENTS,achievementStats,achievements,earnedAchievements,weekOf,packRoomDay,offlineDay,offlineRooms,offlineRoomDay,usedVisits,monthCalendar,monthSummary,MILESTONES,earnedMilestones,seatVisits,roomSnapshot,cacheAge,dailyPick,cancellableRecord,matchRecord,upcomingBookings,roomDay,weekDate,checkinReminders,libraryStats,areaFloors,filterAreas,maskCard,daysUntil,greeting,givenName,permanentRejection,validDay,validTime,Booker,validateTask,validateTaskConflicts,recordMatches,nowChina,active,errorText,favoriteKey,addFavorite,visibleSeats,parseStamp,reservationTimes,bookedTask,periodText,accentPalette};if(typeof module!=='undefined'&&module.exports)module.exports=exports;g.CampusCore=exports;
+const exports={contrastRatio,gestureVelocity,sheetOffset,periodState,NEGATIVE_STATUS,mergeVisitLog,ACHIEVEMENTS,achievementStats,achievements,earnedAchievements,weekOf,packRoomDay,offlineDay,offlineRooms,offlineRoomDay,usedVisits,monthCalendar,monthSummary,MILESTONES,earnedMilestones,seatVisits,roomSnapshot,cacheAge,dailyPick,cancellableRecord,matchRecord,upcomingBookings,roomDay,weekDate,checkinReminders,libraryStats,areaFloors,filterAreas,maskCard,daysUntil,greeting,givenName,permanentRejection,validDay,validTime,Booker,validateTask,validateTaskConflicts,recordMatches,nowChina,active,errorText,favoriteKey,addFavorite,visibleSeats,parseStamp,reservationTimes,bookedTask,periodText,accentPalette};if(typeof module!=='undefined'&&module.exports)module.exports=exports;g.CampusCore=exports;
 })(typeof globalThis!=='undefined'?globalThis:this);

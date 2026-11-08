@@ -9,7 +9,8 @@ test('both hosts allow every library and teaching method the agent implements',(
  assert.ok(lib.includes('cancelBooking')&&teach.includes('rooms'));
  const android=read('android/src/cn/qlucampus/personal/MainActivity.java'),windows=read('windows/Program.cs');
  const list=(src,re)=>{const m=src.match(re);assert.ok(m,'whitelist not found');return [...m[1].matchAll(/"([A-Za-z]+)"/g)].map(x=>x[1]);};
- const aLib=list(android,/system\.equals\("library"\)\?new String\[\]\{([^}]*)\}/),aTeach=list(android,/:new String\[\]\{("status","options"[^}]*)\}/);
+ const aLib=list(android,/library\s*\?\s*new String\[\]\{([^}]*)\}/),aTeach=list(android,/:\s*new String\[\]\{("status",\s*"options"[^}]*)\}/);
+ assert.match(android,/library && "status"\.equals\(method\)/);aLib.push("status");
  const wLib=list(windows,/system=="library"\?new\[\]\{([^}]*)\}/),wTeach=list(windows,/:new\[\]\{("status","options"[^}]*)\}/);
  for(const m of lib){assert.ok(aLib.includes(m),'Android missing '+m);assert.ok(wLib.includes(m),'Windows missing '+m);}
  for(const m of teach){assert.ok(aTeach.includes(m),'Android missing teaching '+m);assert.ok(wTeach.includes(m),'Windows missing teaching '+m);}
@@ -18,7 +19,8 @@ test('submitting methods are treated as uncertain on timeout by the UI and both 
  const ui=read('app/ui.js'),android=read('android/src/cn/qlucampus/personal/MainActivity.java'),windows=read('windows/Program.cs');
  for(const m of ['reserve','temporaryLeave','cancelBooking','checkout']){
   assert.ok(ui.includes("['reserve', 'temporaryLeave', 'cancelBooking', 'checkout'].includes(data.method)"));
-  assert.ok(android.includes('method.equals("'+m+'")'),'Android timeout '+m);
+  assert.ok(android.match(/static boolean isSchoolWrite[\s\S]*?\}/)[0].includes('"'+m+'"'),'Android timeout '+m);
+  assert.match(android,/writeRequest \? "UNCERTAIN"/);
   assert.ok(windows.includes('method=="'+m+'"'),'Windows timeout '+m);
  }
 });

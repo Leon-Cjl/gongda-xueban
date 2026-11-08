@@ -1,10 +1,11 @@
 /* Phone preview fixture, synthetic data only. Never shipped; never contacts the school. */
 (()=>{
  const params=new URLSearchParams(location.search),scenario=params.get('s')||'connected';
+ if(params.get('case')==='fallbackui')window.CampusBuildFlags={uiShellV2:false,motionV2:false,glassQuality:false};
  // 验收按“今天”的合成数据写的：晚上 10 点后跑测试也别自动切到明天（latenight=1 时测试这个行为）。
  if(!params.get('latenight'))window.CampusFixedDay=true;
  // edition=public：按发布版界面运行（构建时由 edition.js 设定）。
- if(params.get('edition')==='public'){window.CampusEdition='public';window.CampusEditionVersion='1.0.0';}
+ if(params.get('edition')==='public'){window.CampusEdition='public';window.CampusEditionVersion=window.CampusEditionVersion||'1.0.0';}
  const key='qa-android-'+scenario;
  const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date());
  const later=(min)=>new Date(Date.now()+min*60000).toISOString();
@@ -19,7 +20,7 @@
  const autologin=params.get('autologin');let autoRan=false;
  let connected=scenario!=='fresh'&&!autologin,teaching=scenario!=='fresh'&&params.get('teach')!=='menu'&&params.get('teach')!=='off',away=false,booked=[];
  const areas=[{id:'11',name:'二楼 · 中文阅览区',floor:'二层',free:37,total:120},{id:'12',name:'三楼东 · 自习区',floor:'三层',free:12,total:96},{id:'13',name:'三楼西 · 考研自习室（靠窗）',floor:'三层',free:0,total:64},{id:'14',name:'四楼 · 外文期刊阅览区',floor:'四层',free:58,total:72},{id:'15',name:'借还书业务',floor:'二层',free:250,total:300}];
- const seatsFor=id=>{const a=areas.find(x=>x.id===id)||areas[0];return Array.from({length:a.total},(_,i)=>{const n=id==='12'?'A'+String(201+i):String(101+i);const free=a.free&&((i*7+3)%Math.ceil(a.total/a.free)===0);return{id:id==='12'?201+i:101+i,no:n,status:free?1:2,available:!!free};});};
+ const seatsFor=id=>{const a=areas.find(x=>x.id===id)||areas[0],fixture=Number((params.get('case')||'').match(/^seats(80|300|1000)$/)?.[1])||a.total;return Array.from({length:fixture},(_,i)=>{const n=id==='12'?'A'+String(201+i):String(101+i);const free=a.free&&((i*7+3)%Math.ceil(a.total/a.free)===0);return{id:id==='12'?201+i:101+i,no:n,status:free?1:2,available:!!free};});};
  const stamp=min=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',dateStyle:'short',timeStyle:'medium'}).format(new Date(Date.now()+min*60000));
  // 当前预约在 3 小时后开始，但不跨过零点（晚上跑测试时不能变成“明天的预约”）。
  const toLate=Math.max(20,Math.floor((Date.parse(new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date())+'T23:30:00+08:00')-Date.now())/60000)),begin=stamp(Math.min(180,toLate)),end=stamp(Math.min(360,toLate+25));
@@ -61,7 +62,14 @@
   case'ready':data={platform:params.get('platform')||'android',state:saved,username:scenario==='fresh'?'':'2024000000',hasCredentials:scenario!=='fresh'};break;
   case'saveState':saved=m.data;window.__saved=saved;try{localStorage.setItem(key,JSON.stringify(saved));}catch(e){}break;
   case'library':window.__schoolCalls=(window.__schoolCalls||0)+1;data=lib(m.data.method,m.data.params||{});break;
-  case'teaching':if(!teaching){if(m.data.method==='status'){data={connected:false,page:'/jwglxt/xtgl/index_initMenu.html'};break;}return fail(m.id,'PAGE','未找到已加载的空闲教室页面，请在学生菜单打开后返回');}if(m.data.method==='rooms'){window.__roomCalls=(window.__roomCalls||0)+1;if(window.__netDown)return fail(m.id,'NETWORK','网络连接失败');}data=m.data.method==='options'?opts:m.data.method==='status'?{connected:true,page:'/jwglxt/cdjy/cdjy_cxKxcdlb.html'}:roomQuery(m.data.params||{});break;
+  case'teaching':if(!teaching){if(m.data.method==='status'){data={connected:false,page:'/jwglxt/xtgl/index_initMenu.html'};break;}return fail(m.id,'PAGE','未找到已加载的空闲教室页面，请在学生菜单打开后返回');}if(m.data.method==='exams'){
+   window.__examCalls=(window.__examCalls||0)+1;
+   if(window.__examFail)return fail(m.id,'NETWORK','模拟断网');
+   data={exams:window.__examData||[
+    {kch:'MATH',kcmc:'高等数学',ksmc:'期末考试',kssj:tomorrow+'(09:00-11:00)',cdxqmc:'长清校区',cdmc:'1号楼201',zwh:'12'},
+    {kch:'MATH',kcmc:'高等数学',ksmc:'期末考试',kssj:'',sjbh:'待定批次一'},
+    {kch:'MATH',kcmc:'高等数学',ksmc:'补考',kssj:'',sjbh:'待定批次二'}]};const examRows=data.exams,examPage=m.data.params?.page||1;data={...data,totalKnown:!window.__examUnknown,total:examRows.length,exams:examRows.slice((examPage-1)*200,examPage*200)};break;
+  }if(m.data.method==='rooms'){window.__roomCalls=(window.__roomCalls||0)+1;if(window.__netDown)return fail(m.id,'NETWORK','网络连接失败');}data=m.data.method==='options'?opts:m.data.method==='status'?{connected:true,page:'/jwglxt/cdjy/cdjy_cxKxcdlb.html'}:roomQuery(m.data.params||{});break;
   case'openLogin':case'openOfficial':window.__official=m.data;setTimeout(()=>{if(m.data.system==='library'||m.data.target==='library'){connected=true;Campus.receive({event:'sessionChanged',system:'library',connected:true});}if(m.data.system==='teaching'||m.data.target==='teaching'){teaching=true;Campus.receive({event:'sessionChanged',system:'teaching',connected:true});}},400);break;
   case'notify':window.__notified=(window.__notified||[]).concat(m.data.title);data={shown:true};break;
   case'exitApp':window.__exited=true;break;
@@ -69,6 +77,8 @@
   case'saveDonate':window.__donateSaved=true;data={saved:true};break;
   case'credentials':case'forgetCredentials':case'appearance':case'openNotifySettings':break;
   case'haptic':haptics.push(m.data.kind);window.__haptics=haptics;break;
+  case'calendarPreview':window.__calendarPlan=m.data;data={planId:'synthetic-plan',calendar:'合成日历',added:m.data.events.length,updated:0,removed:0,unchanged:0};break;
+  case'calendarCommit':window.__calendarWrites=(window.__calendarWrites||0)+1;data={added:window.__calendarPlan.events.length,updated:0,removed:0,calendar:'合成日历'};break;
   case'reminders':reminders=m.data.items||[];window.__reminders=reminders;data={scheduled:reminders.length,exact:false,allowed};break;
   case'connectTeaching':{connectCalls++;window.__connectCalls=connectCalls;const need=params.get('teachauto')==='need';setTimeout(()=>{if(params.get('teachauto')==='menu')Campus.receive({id:m.id,ok:true,data:{connected:true}});else if(need)Campus.receive({id:m.id,ok:true,data:{connected:false,needsUser:true,page:'sso.qlu.edu.cn/login'}});else if(params.get('teach')==='off'||window.__offline)Campus.receive({id:m.id,ok:true,data:{connected:false,offline:true,page:'jw.qlu.edu.cn/sso/ddlogin'}});else{teaching=true;Campus.receive({event:'sessionChanged',system:'teaching',connected:true,probe:true});Campus.receive({id:m.id,ok:true,data:{connected:true}});}},scenario==='slow'?900:300);return;}
   case'notifyState':data=notify();break;
@@ -79,7 +89,8 @@
  // badges=none：已用过但还没有勋章，记录读到后会获得“连续 3 天”。
  if(params.get('badges')==='none')seed.preferences.badges={default:{}};
  // 界面本身就是发布版（奶蛙版这类分支）而用例没指定 edition 时，按已同意协议启动，好让个人版用例也能跑。
- if(window.CampusEdition==='public'&&!params.get('edition'))seed.preferences.consent=1;
+ const consentScenario=['public','publicpc'].includes(params.get('case'))||params.get('edition')==='public'&&!params.has('case');
+ if(window.CampusEdition==='public'&&!consentScenario)seed.preferences.consent=1;
  // opens=99：已经打开过 99 次、一个月前第一次用（发布版感谢弹窗）；donatehidden=1：收款码已收起。
  if(params.get('opens')){seed.preferences.opens={n:Number(params.get('opens')),first:past(30),at:0};seed.preferences.consent=1;}
  if(params.get('donatehidden'))seed.preferences.donateHidden=true;
@@ -89,7 +100,7 @@
  const q=s=>document.querySelector(s),until=async(fn)=>{for(let i=0;i<100&&!fn();i++)await new Promise(r=>setTimeout(r,50));};
  // 截图用：预置一份 4 天前的空教室离线副本。
  // seedcache=1：预置一份 7 天的离线空教室（与 roomQuery 同一套合成规则）；stale=1 时为 4 天前的数据。
- if(params.get('seedcache'))document.addEventListener('DOMContentLoaded',()=>{const C=window.CampusCore,P=[...Array(12)].map((_,i)=>i+1),days={},at=Date.now()-(params.get('stale')?4*86400000:0);for(let i=0;i<7;i++){const d=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date(Date.now()+i*86400000)),states=new Map(rooms.map((r,k)=>[r.id,Object.fromEntries(P.filter(p=>(k+p)%3!==0).map(p=>[p,r.reserved?'2':'1']))]));days[d]={week:C.weekOf(d,7,day),weekday:new Date(d+'T12:00:00+08:00').getUTCDay()||7,at,s:C.packRoomDay(rooms.map(r=>[r.id]),P,states)};}try{localStorage.setItem('qlu.roomOffline.v2',JSON.stringify({v:1,year:'2026',term:'3',campus:'1',yearLabel:'2026–2027',termLabel:'第 1 学期',campusLabel:'长清校区',buildings:opts.jxl_id,periods:P,base:{day,week:7},rooms:rooms.map(r=>[r.id,r.name,r.building,r.capacity]),days,at,synced:day}));}catch(e){}});
+ if(params.get('seedcache'))document.addEventListener('DOMContentLoaded',()=>{const C=window.CampusCore,P=[...Array(12)].map((_,i)=>i+1),days={},at=Date.now()-(params.get('stale')?4*86400000:0);for(let i=0;i<7;i++){const d=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date(Date.now()+i*86400000)),states=new Map(rooms.map((r,k)=>[r.id,Object.fromEntries(P.filter(p=>(k+p)%3!==0).map(p=>[p,r.reserved?'2':'1']))]));days[d]={week:C.weekOf(d,7,day),weekday:new Date(d+'T12:00:00+08:00').getUTCDay()||7,at,s:C.packRoomDay(rooms.map(r=>[r.id]),P,states)};}try{localStorage.setItem('qlu.roomOffline.v2',JSON.stringify({v:1,adapterVersion:2,year:'2026',term:'3',campus:'1',yearLabel:'2026–2027',termLabel:'第 1 学期',campusLabel:'长清校区',buildings:opts.jxl_id,periods:P,base:{day,week:7},rooms:rooms.map(r=>[r.id,r.name,r.building,r.capacity]),days,at,synced:day}));}catch(e){}});
  window.addEventListener('load',async()=>{
   await until(()=>window.CampusRuntimeReady&&q('#progress').hidden&&q('[data-area]'));
   if(params.get('open')){q('[data-area="'+params.get('open')+'"]')?.click();await until(()=>q('.seat-card')&&q('#progress').hidden);}
@@ -100,5 +111,6 @@
   if(params.get('sheet')==='settings'){q('[data-action="settings"]')?.click();}
   if(!params.get('open'))window.scrollTo(0,0);
   if(params.get('scrollto')){await until(()=>q(params.get('scrollto')));q(params.get('scrollto'))?.scrollIntoView({block:'center'});}
+  window.__qaPreviewReady=true;
  });
 })();

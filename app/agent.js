@@ -19,25 +19,28 @@
    payload={aesjson:btoa(String.fromCharCode(...new Uint8Array(bytes)))};
   }
   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),timeout);
+  try{
   let response;
   try{response=await fetch(path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest',authorization:'bearer'+token()},body:JSON.stringify(payload),signal:ctl.signal});}
-  catch(e){throw error(writing?'UNCERTAIN':'NETWORK',writing?'操作结果尚不明确，请核对学校当前预约；未自动重试':'网络连接失败，请稍后重试',{uncertain:writing});}
-  finally{clearTimeout(timer);}
+  catch(e){throw error(writing?'UNCERTAIN':e?.name==='AbortError'?'TIMEOUT':'NETWORK',writing?'操作结果尚不明确，请核对学校当前预约；未自动重试':e?.name==='AbortError'?'学校响应超时':'网络连接失败，请稍后重试',{uncertain:writing});}
   if(response.status===401||response.status===403)throw error('AUTH','图书馆登录已过期，请重新登录');
   if(response.status===429)throw error('RATE_LIMIT','学校系统请求频繁，请稍后重试');
   if(!response.ok)throw error(writing?'UNCERTAIN':'NETWORK','学校服务暂时不可用',{uncertain:writing});
-  let r;try{r=await response.json();}catch(e){throw error(writing?'UNCERTAIN':'PARSE','学校返回的内容读不懂，可能系统改版了',{uncertain:writing});}
+  let r;try{r=await response.json();}catch(e){throw error(writing?'UNCERTAIN':e?.name==='AbortError'?'TIMEOUT':e?.name==='SyntaxError'?'PARSE':'NETWORK','学校响应未完整读入或格式有变化，请稍后核对',{uncertain:writing});}
+  if(!r||typeof r!=='object'||Array.isArray(r)||!(typeof r.code==='number'&&Number.isInteger(r.code)||typeof r.code==='string'&&/^\d+$/.test(r.code)))throw error(writing?'UNCERTAIN':'PARSE','学校响应缺少有效状态码',{uncertain:writing});
   if(Number(r.code)===10001)throw error('AUTH','图书馆登录已过期，请重新登录');
   if(Number(r.code)!==0)throw error('SCHOOL',String(r.message||r.msg||'学校系统未接受操作'));
   if(token())send({session:token()});
   return r.data;
+  }finally{clearTimeout(timer);}
  }
  const list=x=>Array.isArray(x)?x:[];
  const hhmm=x=>{if(!x)return'';const m=String(x).match(/(?:^|[ T])(\d{2}:\d{2})/);return m?m[1]:'';};
  const seatName=x=>String(x.no??x.name??x.id);
  // 官方页面显示“取消预约”的条件：普通座位记录 status 为 2 或 9，且（字段存在时）oksign 为 1。
  const cancellable=x=>['2','9'].includes(String(x?.status))&&(x.oksign==null||Number(x.oksign)===1);
- const records=async()=>{const d=await post('/v4/member/seat',{type:1,page:1,limit:100});return Array.isArray(d)?d:list(d?.data||d?.list);};
+ const recordList=d=>{if(!Array.isArray(d)||d.some(x=>!x||typeof x!=='object'||Array.isArray(x)))throw error('PARSE','学校返回的预约列表格式有变化，请到学校页面核对');return d;};
+ const records=async()=>{const d=await post('/v4/member/seat',{type:1,page:1,limit:100});return recordList(Array.isArray(d)?d:d?.data??d?.list);};
  async function configuration(){
   let d=await post('/v4/index/peizhi',{},false,false,8000);
   if(typeof d==='string'){
@@ -49,7 +52,7 @@
   return d||{};
  }
  async function current(){
-  const d=await post('/v4/index/subscribe',{},false,false,8000),rows=list(d).filter(x=>Number(x.type)===1);
+  const d=await post('/v4/index/subscribe',{},false,false,8000),rows=recordList(d).filter(x=>Number(x.type)===1);
   if(!rows.length)return[];
   const config=await configuration();
   // canCheckout：与官方当前预约页“签退/结束使用”按钮的条件一致（学校开放签退，且已入座或暂离）。
@@ -80,7 +83,7 @@
   // 只读：账号状态与违约记录。手机号、邮箱不取出。
   if(method==='profile'){
    const d=await post('/v4/member/my',{},false,false,10000)||{},code=String(d.status??'');
-   return{name:String(d.name||''),card:String(d.card||d.id||''),dept:String(d.deptName||''),status:code,statusText:({'1':'正常','0':'注销','2':'挂失','3':'临时禁止'})[code]||(code?'未知状态':''),validUntil:String(d.date||'')};
+   return{name:String(d.name||''),card:String(d.card||''),dept:String(d.deptName||''),status:code,statusText:({'1':'正常','0':'注销','2':'挂失','3':'临时禁止'})[code]||(code?'未知状态':''),validUntil:String(d.date||'')};
   }
   if(method==='violations'){
    const d=await post('/v4/member/seatRenege',{type:1,page:1,limit:20},false,false,10000),rows=Array.isArray(d)?d:list(d?.data);
@@ -117,7 +120,8 @@
     await post('/v4/space/cancel',{id:item.id},false,true,8000);
     let after;try{after=await records();}catch(e){throw error('UNCERTAIN','取消已提交，但刷新记录失败',{uncertain:true});}
     const now=after.find(x=>String(x.id)===String(item.id));
-    return{verified:!now||!cancellable(now),records:after};
+    const label=String(now?.status_name||'')+' '+String(now?.statusMsg||'');
+    return{verified:!!now&&/已取消|已撤销|取消成功|撤销成功/.test(label),records:after};
    }finally{leaving=false;}
   }
   // 结束使用（提前离馆）：释放座位。提交前后都读当前预约，从当前预约里消失才算核验成功。
@@ -130,7 +134,9 @@
     if(!item.canCheckout)throw error('SCHOOL','学校当前不允许结束这个预约');
     await post('/v4/space/checkout',{id:item.id},false,true,8000);
     let after;try{after=await current();}catch(e){throw error('UNCERTAIN','结束使用已提交，但刷新状态失败',{uncertain:true});}
-    return{verified:!after.some(x=>String(x.id)===String(item.id)),current:after};
+    let history;try{history=await records();}catch(e){throw error('UNCERTAIN','结束使用已提交，但无法核验结束记录',{uncertain:true});}
+    const ended=history.find(x=>String(x.id)===String(item.id)),label=String(ended?.status_name||'')+' '+String(ended?.statusMsg||'');
+    return{verified:!after.some(x=>String(x.id)===String(item.id))&&!!ended&&/已结束|已完成|已签退|已离馆/.test(label),current:after,records:history};
    }finally{leaving=false;}
   }
   if(method==='reserve'){
@@ -148,13 +154,28 @@
  }
  function selectOptions(d,id){const el=d.getElementById(id)||d.querySelector('[name="'+id+'"]');return el?.options?Array.from(el.options).map(o=>({value:o.value,label:o.textContent.trim(),selected:o.selected})):[];}
  const value=(d,id)=>d.getElementById(id)?.value||'';
+ function teachingLoginResponse(text,url=''){
+  try{const u=new URL(url,location.href);if(u.hostname==='sso.qlu.edu.cn'||/\/login_slogin\.html|\/sso\//i.test(u.pathname))return true;}catch(e){}
+  const html=String(text||'').replace(/^\uFEFF/,'');
+  return /^\s*(?:<!doctype\s+html|<html|<form)/i.test(html)&&(/<h5\b[^>]*>\s*用户登录\s*<\/h5>/i.test(html)||/<form\b[^>]*action\s*=\s*["'][^"']*(?:login_slogin|j_spring_security_check)/i.test(html)||/(?:location\.(?:href|replace)|http-equiv\s*=\s*["']refresh)[\s\S]{0,250}(?:login_slogin|sso\.qlu\.edu\.cn)/i.test(html));
+ }
+ async function teachingJson(r){
+  if(r.status===401||r.status===403)throw error('AUTH','请重新登录学生教务');
+  if(r.ok===false)throw error('NETWORK','教务服务返回 '+r.status);
+  if(r.redirected&&teachingLoginResponse('',r.url))throw error('EXPIRED','教务登录已过期，请重新连接');
+  if(typeof r.text==='function'){
+   let text;try{text=await r.text();}catch(e){throw error(e?.name==='AbortError'?'TIMEOUT':'NETWORK','教务响应未完整读入，请稍后重试');}if(teachingLoginResponse(text))throw error('EXPIRED','教务登录已过期，请重新连接');
+   try{return JSON.parse(text);}catch(e){throw error('PARSE','教务返回格式有变化，请到教务核对');}
+  }
+  try{return await r.json();}catch(e){throw error(e?.name==='AbortError'?'TIMEOUT':e?.name==='SyntaxError'?'PARSE':'NETWORK','教务响应未完整读入或格式有变化，请到教务核对');}
+ }
  async function teachingPost(ctx,path,body,verb='POST'){
   // Use the school's own jQuery request hooks, which attach its menu/session parameters.
   const jq=ctx.w.jQuery;
-  if(jq?.ajax)return new Promise((resolve,reject)=>jq.ajax({url:path,type:verb,data:Object.fromEntries(body),dataType:'json',timeout:20000,success:resolve,error:(xhr,status)=>reject(error(status==='timeout'?'TIMEOUT':xhr.status===401||xhr.status===403?'AUTH':status==='parsererror'?'PARSE':'NETWORK','教务查询失败（'+(xhr.status||status)+'）'))}));
+  if(jq?.ajax)return new Promise((resolve,reject)=>jq.ajax({url:path,type:verb,data:Object.fromEntries(body),dataType:'json',timeout:20000,success:resolve,error:(xhr,status)=>reject(error(status==='timeout'?'TIMEOUT':xhr.status===401||xhr.status===403?'AUTH':teachingLoginResponse(xhr.responseText,xhr.responseURL)?'EXPIRED':status==='parsererror'?'PARSE':'NETWORK','教务查询失败（'+(xhr.status||status)+'）'))}));
   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
   // 真机上教务页自己的 jQuery 常常没加载，走这里；断网时 fetch 抛的是不带 code 的 TypeError，要标成 NETWORK / TIMEOUT，界面才会退回本机数据。
-  try{let r;try{r=await ctx.w.fetch(verb==='GET'?path+'?'+body.toString():path,{method:verb,credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body:verb==='GET'?undefined:body,signal:ctl.signal});}catch(e){throw error(e?.name==='AbortError'?'TIMEOUT':'NETWORK',e?.name==='AbortError'?'教务响应超时':'连不上教务（网络断开或不在校园网）');}if(r.status===401||r.status===403)throw error('AUTH','请重新登录学生教务');if(r.ok===false)throw error('NETWORK','教务服务返回 '+r.status);try{return await r.json();}catch(e){throw error('PARSE','教务返回的不是查询结果，可能登录过期了');}}finally{clearTimeout(timer);}
+  try{let r;try{r=await ctx.w.fetch(verb==='GET'?path+'?'+body.toString():path,{method:verb,credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body:verb==='GET'?undefined:body,signal:ctl.signal});}catch(e){throw error(e?.name==='AbortError'?'TIMEOUT':'NETWORK',e?.name==='AbortError'?'教务响应超时':'连不上教务（网络断开或不在校园网）');}return await teachingJson(r);}finally{clearTimeout(timer);}
  }
  // start（YYYY-MM-DD）是第 first 周（学校的 ZXZC，常为 0）所在的那一天；算今天（北京时间）是第几周，周一起算；不在 1–30 周内就当没有。
  function weekFrom(start,first=1){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(start||'')))return null;const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date()),monday=x=>{const t=Date.parse(x+'T12:00:00Z');return t-((new Date(t).getUTCDay()+6)%7)*86400000;},w=Math.round((monday(day)-monday(start))/604800000)+(Number.isFinite(Number(first))?Number(first):1);return w>=1&&w<=30?w:null;}
@@ -162,7 +183,7 @@
  async function teaching(method,p){
   const ctx=teachingContext()||(method==='exams'&&location.hostname==='jw.qlu.edu.cn'?{w:window,d:document,url:new URL(location.href)}:null);
   if(method==='status')return{connected:!!teachingContext(),page:location.pathname};
-  if(!ctx)throw error('PAGE','未找到已加载的空闲教室页面，请在学生菜单打开后返回；支持页面内嵌的查询页');
+  if(!ctx)throw error('PAGE',method==='exams'?'没找到已登录的教务页面，请重新连接教务':'未找到已加载的空闲教室页面，请在学生菜单打开后返回；支持页面内嵌的查询页');
   const d=ctx.d;
   if(method==='options'){
    const fields={};for(const id of ['xnm','xqm','xqh_id','cdlb_id'])fields[id]=selectOptions(d,id);
@@ -200,21 +221,30 @@
    const result=await teachingPost(ctx,'/jwglxt/cdjy/cdjy_cxKxcdlb.html?doType=query&gnmkdm='+encodeURIComponent(menu),body);
    const rows=Array.isArray(result?.items)?result.items:Array.isArray(result?.rows)?result.rows:null;
    if(!rows)throw error('PARSE','学校没有返回教室列表');
-   return{total:Number(result.totalResult??result.total??result.records??rows.length),page:Math.max(1,Number(p.page)||1),pageSize:size,rooms:rows.map(x=>({id:x.cd_id||x.cdxqxx_id||x.cdbh,name:x.cdmc||x.cdbh||'教室',building:x.jxlmc||x.jxl||'',campus:x.xqmc||'',capacity:x.sjzws||x.zws||x.zwzs||x.zws1||'',reserved:['1','是','已被预约'].includes(String(x.sfybyy))}))};
+   if(rows.some(x=>!x||typeof x!=='object'||Array.isArray(x)||!(x.cd_id||x.cdxqxx_id||x.cdbh)))throw error('PARSE','教室记录缺少有效编号');
+   const rawTotal=result.totalResult??result.total??result.records,totalKnown=rawTotal!=null;
+   if(totalKnown&&!(typeof rawTotal==='number'&&Number.isInteger(rawTotal)&&rawTotal>=0||typeof rawTotal==='string'&&/^\d+$/.test(rawTotal)))throw error('PARSE','教室分页总数异常');
+   return{total:totalKnown?Number(rawTotal):rows.length,totalKnown,page:Math.max(1,Number(p.page)||1),pageSize:size,rooms:rows.map(x=>({id:x.cd_id||x.cdxqxx_id||x.cdbh,name:x.cdmc||x.cdbh||'教室',building:x.jxlmc||x.jxl||'',campus:x.xqmc||'',capacity:x.sjzws||x.zws||x.zwzs||x.zws1||'',reserved:['1','是','已被预约'].includes(String(x.sfybyy))}))};
   }
   // 考试信息：学校“学生考试信息查询”（只读）。在已登录的教务页里直接发请求；只回考试相关字段，学号姓名班级这类个人信息不带出去
   if(method==='exams'){
    const xnm=String(p.year||value(d,'xnm')),xqm=String(p.term||value(d,'xqm'));
    if(!/^\d{4}$/.test(xnm)||!/^\d{1,2}$/.test(xqm))throw error('INVALID','请选择有效的学年学期');
-   const body=new URLSearchParams({xnm,xqm,ksmcdmb_id:'',kch:'',kc:'',ksrq:'',kkbm_id:'',_search:'false',nd:String(Date.now()),'queryModel.showCount':'200','queryModel.currentPage':'1','queryModel.sortName':'','queryModel.sortOrder':'asc',time:'0'});
+   const page=Math.max(1,Math.min(10,Number(p.page)||1)),pageSize=200;
+   const body=new URLSearchParams({xnm,xqm,ksmcdmb_id:'',kch:'',kc:'',ksrq:'',kkbm_id:'',_search:'false',nd:String(Date.now()),'queryModel.showCount':String(pageSize),'queryModel.currentPage':String(page),'queryModel.sortName':'','queryModel.sortOrder':'asc',time:'0'});
    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
-   let r;try{r=await ctx.w.fetch('/jwglxt/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105',{method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body,signal:ctl.signal});}catch(e){throw error(e?.name==='AbortError'?'TIMEOUT':'NETWORK',e?.name==='AbortError'?'教务响应超时':'连不上教务（网络断开或不在校园网）');}finally{clearTimeout(timer);}
-   if(r.status===401||r.status===403)throw error('AUTH','请重新登录学生教务');
-   let j;try{j=await r.json();}catch(e){throw error('PARSE','教务返回的不是考试信息，可能登录过期了');}
+   let j;try{
+   let r;try{r=await ctx.w.fetch('/jwglxt/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105',{method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body,signal:ctl.signal});}catch(e){throw error(e?.name==='AbortError'?'TIMEOUT':'NETWORK',e?.name==='AbortError'?'教务响应超时':'连不上教务（网络断开或不在校园网）');}
+   j=await teachingJson(r);
+   }finally{clearTimeout(timer);}
    const rows=Array.isArray(j?.items)?j.items:null;
    if(!rows)throw error('PARSE','学校没有返回考试列表');
-   const skip=new Set(['xh_id','xh','xm','xb','bj','njmc','zymc','jgmc','pycc','row_id','totalresult','xnm','xqm']);
-   return{year:xnm,term:xqm,exams:rows.map(x=>Object.fromEntries(Object.entries(x).filter(([k,v])=>!skip.has(k)&&v!=null&&v!==''&&typeof v!=='object').map(([k,v])=>[k,String(v).slice(0,200)])))};
+   if(rows.some(x=>!x||typeof x!=='object'||Array.isArray(x)))throw error('PARSE','考试记录结构异常');
+   const allowed=new Set(['kcmc','kch','ksmc','kssj','cdxqmc','cdmc','zwh','cdbh','cdjc','ksfs','khfs','xf','kkxy','jsxx','sksj','jxdd','xnmc','xqmmc','xqmc','cxbj','zxbj','sjbh']);
+   const rawTotal=j.totalResult??j.records,totalKnown=rawTotal!=null;
+   if(totalKnown&&!(typeof rawTotal==='number'&&Number.isSafeInteger(rawTotal)&&rawTotal>=0||typeof rawTotal==='string'&&/^\d+$/.test(rawTotal)&&Number.isSafeInteger(Number(rawTotal))))throw error('PARSE','考试分页总数异常');
+   if(rows.length>pageSize)throw error('PARSE','考试分页长度异常');
+   return{year:xnm,term:xqm,page,pageSize,totalKnown,total:totalKnown?Number(rawTotal):null,exams:rows.map(x=>Object.fromEntries(Object.entries(x).filter(([k,v])=>allowed.has(k)&&v!=null&&v!==''&&typeof v!=='object').map(([k,v])=>[k,String(v).slice(0,200)])))};
   }
   throw error('INVALID','未知教务操作');
  }
