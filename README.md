@@ -84,3 +84,7 @@ tools\android-build\...\aapt2.exe   （同目录 lib\d8.jar、lib\apksigner.jar�
 ## 许可证
 
 代码以 [MIT](LICENSE) 许可证开源。`app/donate.png` 是作者的收款码，请勿在你自己发布的版本里沿用。
+
+## 相关项目
+
+[Leon 的项目主页](https://github.com/Leon-Cjl) · [校园电费](https://github.com/Leon-Cjl/campus-dianfei) · [工大学伴](https://github.com/Leon-Cjl/gongda-xueban) · [奶蛙版](https://github.com/Leon-Cjl/gongda-xueban-naiwa) · [宿舍快开](https://github.com/Leon-Cjl/dorm-native-open)
