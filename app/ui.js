@@ -1,101 +1,13 @@
 /* 工大学伴 · 共享界面逻辑（安卓 WebView 与 Windows WebView2 共用）。
-   学校请求一律经本机客户端转发；这里负责界面状态、预约调度与本机保存。 */
+   学校请求一律经本机客户端转发；这里负责界面状态、预约调度与本机保存。
+   新架构：构建开关/常量/图标/状态模型已抽离到 shell.js（window.CampusShell），此处桥接引用，函数体不变。 */
 (() => {
-'use strict';
-// Local build switches: UI fallback never rolls back identity ownership or write records.
-const BUILD_FLAGS = Object.freeze({uiShellV2: window.CampusBuildFlags?.uiShellV2 !== false, motionV2: window.CampusBuildFlags?.motionV2 !== false, glassQuality: window.CampusBuildFlags?.glassQuality !== false});
+"use strict";
+const {BUILD_FLAGS, VERSION, PUBLIC, SHOWN_VERSION, LEGAL, C, NW, $, $$, esc, same, svg, I, ACCENTS, PAGES, NAV, STATUS, TONE, WEEKDAYS, QUOTES, TEXT_INPUT, state} = window.CampusShell;
 if (!BUILD_FLAGS.motionV2) document.documentElement.dataset.motion = 'off';
 if (!BUILD_FLAGS.glassQuality) delete document.documentElement.dataset.glass;
-const VERSION = window.CampusEditionVersion || document.querySelector('.footer')?.textContent.match(/工大学伴\s+(\d+(?:\.\d+)+)/)?.[1] || '';
-// 公开版：单账号、只有“立即预约”；有可收起的“支持作者”卡片和《用户协议与隐私说明》。
-const PUBLIC = window.CampusEdition === 'public';
-const SHOWN_VERSION = PUBLIC ? (window.CampusEditionVersion || '') : VERSION;
-const LEGAL = window.CampusLegal || {version: 0, sections: []};
-const C = CampusCore;
-// 奶蛙版（普通版的分支）：带了 naiwa-theme.js、pet-*.js 时启用主题和奶蛙小屋；普通版没有这些文件，下面的挂接都不起作用。
-const NW = !!window.NaiwaTheme;
-window.NaiwaTheme?.install();
 let mascotThemeSaving = false, petUI = null;
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-const same = (a, b) => String(a) === String(b);
-const svg = (body, cls = '') => '<svg class="icon' + cls + '" viewBox="0 0 24 24" aria-hidden="true">' + body + '</svg>';
-const STAR = '<path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/>';
-const I = {
- library: svg('<path d="M12 6.6C10 5.1 7 4.6 3.5 5.1v13.2c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5.1C17 4.6 14 5.1 12 6.6Z"/><path d="M12 6.6v13.2"/>'),
- room: svg('<path d="M5.5 20.5V4.8c0-.7.6-1.3 1.3-1.3h10.4c.7 0 1.3.6 1.3 1.3v15.7"/><path d="M3 20.5h18"/><path d="M14.6 12.2v.6"/>'),
- alarm: svg('<circle cx="12" cy="13" r="7.5"/><path d="M12 9.3V13l2.6 1.9"/><path d="M4.6 5.2 7 3.2M19.4 5.2 17 3.2"/>'),
- qr: svg('<rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.3"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.3"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.3"/><path d="M14 14h2.6v2.6H14zM17.9 17.9h2.6v2.6h-2.6zM14 20.5h1.2M20.5 14v1.2"/>'),
- refresh: svg('<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>'),
- back: svg('<path d="M15 5.5 8.5 12l6.5 6.5"/>'),
- chevron: svg('<path d="m9.5 5.5 6.5 6.5-6.5 6.5"/>'),
- close: svg('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
- star: svg(STAR),
- starOn: svg(STAR, ' fill'),
- calendar: svg('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
- search: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/>'),
- check: svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
- warn: svg('<path d="M12 4 2.8 19.5h18.4Z"/><path d="M12 10v4.2M12 17v.3"/>'),
- ok: svg('<circle cx="12" cy="12" r="8.5"/><path d="m8 12.3 2.8 2.7L16.2 9.5"/>'),
- minus: svg('<path d="M6 12h12"/>'),
- plus: svg('<path d="M12 6v12M6 12h12"/>'),
- map: svg('<path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2-6-2Z"/><path d="M9 4.5v13M15 6.5v13"/>'),
- user: svg('<circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 20c.9-3.8 3.7-5.8 7.2-5.8s6.3 2 7.2 5.8"/>'),
- dice: svg('<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01M12 12h.01" stroke-width="2.6"/>'),
- bell: svg('<path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2h-14Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
- flag: svg('<path d="M5.5 21V4M5.5 4.5h11l-2 3.5 2 3.5h-11"/>'),
- medal: svg('<circle cx="12" cy="15" r="5.5"/><path d="M7 3h3.2l2 6.6M17 3h-3.2l-2 6.6"/><path d="m12 12.6.8 1.6 1.7.2-1.3 1.2.3 1.7-1.5-.8-1.5.8.3-1.7-1.3-1.2 1.7-.2Z"/>')
-};
-const ACCENTS = [['blue', '#3482FF', '澎湃蓝'], ['teal', '#00A1B5', '青碧'], ['green', '#18A957', '翠绿'], ['purple', '#7B5CF5', '星紫'], ['orange', '#FF7A1A', '活力橙'], ['pink', '#EE4C86', '樱粉'], ['red', '#E5484D', '朱红'], ['graphite', '#5B6573', '石墨']];
-const PAGES = {library: '图书馆', rooms: '空教室', tasks: '预约任务', pass: '入馆码', exams: '考试', me: '我的'};
-// 双端分工：手机侧重查询、入馆和提醒（不常驻后台），任务并入“我的”；电脑上任务单独成页。
-// 手机底栏：入馆码放在正中间
-const NAV = {android: ['library', 'rooms', 'pass', 'exams', 'me'], windows: ['library', 'tasks', 'rooms', 'me']};
-const STATUS = {pending: '待执行', checking: '登录预检', submitting: '提交中', verifying: '核验中', succeeded: '已成功', failed: '未成功', uncertain: '确认中', needs_auth: '需要登录', missed: '已错过', cancelled: '已取消'};
-const TONE = {pending: 'info', checking: 'info', submitting: 'info', verifying: 'info', succeeded: 'ok', failed: 'err', uncertain: 'warn', needs_auth: 'warn', missed: 'warn'};
-const WEEKDAYS = '一二三四五六日';
-// 每日一句：只选出处明确的古籍原句，同一天固定一句。
-const QUOTES = [
- ['不积跬步，无以至千里。', '荀子《劝学》'],
- ['骐骥一跃，不能十步；驽马十驾，功在不舍。', '荀子《劝学》'],
- ['锲而不舍，金石可镂。', '荀子《劝学》'],
- ['博观而约取，厚积而薄发。', '苏轼'],
- ['古之立大事者，不惟有超世之才，亦必有坚忍不拔之志。', '苏轼《晁错论》'],
- ['路漫漫其修远兮，吾将上下而求索。', '屈原《离骚》'],
- ['业精于勤，荒于嬉；行成于思，毁于随。', '韩愈《进学解》'],
- ['千里之行，始于足下。', '《老子》'],
- ['纸上得来终觉浅，绝知此事要躬行。', '陆游'],
- ['学而不思则罔，思而不学则殆。', '《论语》'],
- ['知之者不如好之者，好之者不如乐之者。', '《论语》'],
- ['天行健，君子以自强不息。', '《周易》'],
- ['君子藏器于身，待时而动。', '《周易》'],
- ['长风破浪会有时，直挂云帆济沧海。', '李白'],
- ['为者常成，行者常至。', '《晏子春秋》'],
- ['凡事预则立，不预则废。', '《礼记·中庸》'],
- ['人一能之，己百之；人十能之，己千之。', '《礼记·中庸》'],
- ['读书不觉已春深，一寸光阴一寸金。', '王贞白'],
- ['盛年不重来，一日难再晨。', '陶渊明'],
- ['志不强者智不达。', '《墨子》']
-];
-const TEXT_INPUT = 'input[type=search],input[type=text],input[type=number],input[type=password],input:not([type])';
-
-const state = {
- activeAccountId: 'default', accounts: [], supportsAccounts: false, page: 'library', platform: window.CampusPlatform || (window.NativeHost ? 'android' : 'unknown'),
- tasks: [], libraryConnected: false, teachingConnected: false, hasCredentials: false, username: '', systemDark: undefined,
- bootPending: true, bootError: '', localStateBlocked: false, vaultState: 'unknown', restartPersistence: 'none', authProtocol: false, libraryAuth: null,
- catalog: [], areas: [], seats: [], selection: [], records: [], recordsLoaded: false, current: [], currentError: '',
- day: C.nowChina(), libraryId: '', areaId: '', start: '', end: '', kind: 3, segment: '', info: null,
- loading: false, error: '', updated: '', teachingOptions: null, rooms: null, roomQuery: null, roomFavoritesOnly: false, roomFormOpen: true, termOpen: false, teachingHint: '',
- bookingId: '', favorites: [], notify: null, currentAt: 0, knownCurrent: [],
- profile: null, violations: null, statusAt: 0, statusLoading: false, statusError: '', rules: {}, reminders: [], remindersAt: 0, areaQuery: '', roomBuilding: '', roomSort: '',
- teachingAuto: {busy: false, tried: false, needsUser: false, error: ''},
- roomDay: null, roomFind: '', roomFindDate: '', calMonth: '', roomLoading: false, roomsStale: false, roomLimit: 0, libraryAuto: {busy: false, needsUser: false},
- preferences: {...(NW ? {mascotTheme: 'naiwa'} : {}), theme: 'system', motion: 'auto', quality: 'standard', glass: 'auto', accent: 'blue', seatNotify: true, roomQuery: null, seatFilter: {query: '', freeOnly: true, favoriteOnly: false}, areaFilter: {floor: '', freeOnly: false, sort: ''}, checkinLead: 15, countdown: null, manualReminders: [], firedReminders: [], desktopNotify: true}
-};
-// 读取标记按用途分开：读入馆记录、提交签退等不再挡住换日期和选座。state.loading 只是“有任何一种在读”，给进度条和通用判断用。
-state.reading = {library: false, current: false, records: false, op: false, account: false};
-Object.defineProperty(state, 'loading', {get: () => Object.values(state.reading).some(Boolean), set: v => { state.reading.account = !!v; }});
+window.NaiwaTheme?.install();
 const pending = new Map();
 let seq = 0, accountBusy = false, creatingTasks = false, booker, lastPage = '', pendingLeave = null, leaving = false, cancelling = false, checkingOut = false, untilToken = 0, roomDefaultsApplied = false, lastLive = '', teachingConnecting = false, lastReminders = '';
 const lastStatus = new Map();
@@ -190,7 +102,8 @@ let lastTick = 0;
 let lastRetry = 0;
 function retryFailedReads() {
  if (!window.CampusRuntimeReady || state.loading || Date.now() - lastRetry < 60000 || $('#dialog').open) return;
- if (state.currentError && state.libraryConnected && ['library', 'me'].includes(state.page)) { lastRetry = Date.now(); busy(refreshCurrent, {quiet: true, kind: 'current'}); }
+ if (['rooms', 'exams'].includes(state.page) && !onlineRooms() && state.teachingAuto.phase === 'retryable' && !state.teachingAuto.busy && !state.teachingAuto.needsUser && Date.now() >= (state.teachingAuto.retryAt || 0)) { lastRetry = Date.now(); if (state.page === 'rooms') autoConnectTeaching(); else maybeRefreshExams(); }
+ else if (state.currentError && state.libraryConnected && ['library', 'me'].includes(state.page)) { lastRetry = Date.now(); busy(refreshCurrent, {quiet: true, kind: 'current'}); }
  else if (state.statusError && state.libraryConnected && state.page === 'me' && !state.statusLoading) { lastRetry = Date.now(); loadAccountStatus({force: true}); }
 }
 // 过了零点：空教室的当前周跟着算，查询条件原来是“本周、今天”的换成新的今天；已查的结果保留，日期按新的一天显示（会写成“昨天”）。
@@ -204,13 +117,21 @@ function rollRoomDay() {
  if (q && oldWeek && Number(q.week) === Number(oldWeek) && Number(q.weekday) === prevWd) state.preferences.roomQuery = {...q, week: o.currentWeek, weekday: chinaWeekday()};
  if (state.page === 'rooms' && !$('#dialog').open && !state.roomLoading) render();
 }
-// 客户端跨过零点一直开着时，日期还停在昨天：自动换到今天并重读座位。
-function rollDay() {
- const today = C.nowChina();
- if (!window.CampusRuntimeReady || state.loading || state.day >= today || $('#dialog').open) return;
- state.day = today; state.selection = [];
- if (state.libraryConnected) loadLibrary(); else render();
+// Bookable dates follow Beijing time: today's reservations close at 22:00.
+function earliestBookingDay() { const today = C.nowChina(); return chinaHour() >= 22 ? addDays(today, 1) : today; }
+function normalizeBookingDay() {
+ const first = earliestBookingDay();
+ if (state.day >= first) return false;
+ Object.assign(state, {day:first, selection:[], areas:[], info:null, seats:[], openingArea:'', updated:'', error:''});
+ return true;
 }
+function rollDay() {
+ if (!window.CampusRuntimeReady || state.loading || $('#dialog').open) return false;
+ if (!normalizeBookingDay()) return false;
+ if (state.libraryConnected) loadLibrary(); else render();
+ return true;
+}
+
 function api(method, params = {}, accountId = state.activeAccountId, subjectId = '') {
  if (state.localStateBlocked) return Promise.reject(Object.assign(Error('本机账号数据尚未恢复，未发送操作'), {code:'LOCAL_STATE',notSent:true}));
  if (method === 'reserve' && state.platform === 'android' && (document.hidden || state.foreground === false)) return Promise.reject(Object.assign(Error('助手已离开前台，未提交预约'), {code: 'PAUSED'}));
@@ -241,9 +162,13 @@ const teachingReads = window.CampusReadQueue.create({
 const operations = window.CampusOperations.create({state, save, recordMatches: C.recordMatches});
 const motion = window.CampusMotion.create({enabled: () => motionOn() && !document.hidden});
 const diagnostics = window.CampusDiagnostics.create();
+/* Motion runtime manages transient compositor hints; motion.js owns animation lifecycle. */
+const runtime = window.CampusMotionRuntime;
+// Overlapping animations share compositor hints until their final owner settles.
+if (runtime && typeof runtime.wrapMotion === "function") runtime.wrapMotion(motion);
 let overlayRevision = 0;
 let pressed = null, pressPointer = null, releasedAt = 0;
-const navDrag = {id:null,timer:0,frame:0,scaleUntil:0,on:false,x0:0,y0:0,x:0,over:null,ate:0,w:0,h:0};
+const navDrag = {id:null,timer:0,frame:0,scaleUntil:0,on:false,x0:0,y0:0,x:0,over:null,ate:0,w:0,h:0,growFrom:null,started:0,captureTarget:null,trackWidth:0};
 const syncVisibility = () => { const hidden = document.hidden || state.platform === 'android' && state.foreground === false;document.documentElement.dataset.pageHidden = String(hidden); if (hidden) { diagnostics.stop();const d = $('#dialog'),closing = d?.classList.contains('closing') || d?.classList.contains('closing-drag');motion.finishAll();const nav = $('.nav');if (nav) navDragEnd(nav,false);endPress(true);d?.cancelDrag?.();if (closing && d.open) d.close(); } };
 document.addEventListener('visibilitychange', syncVisibility);syncVisibility();
 // limit：调用方从发出时算起的等待上限；超时先让界面兜底，底层请求结束前队列不放行。
@@ -303,12 +228,12 @@ function sessionChanged(m) {
  if (m.system === 'teaching') {
   state.teachingConnected = !!m.connected;
   let switched = false;
-  if (m.connected) state.teachingAuto.needsUser = false;
+  if (m.connected) { teachingSession.userResolved(); state.teachingAuto.needsUser = false; }
   else { state.teachingHint = '学生教务未连接。'; if (onlineRooms() && offlineData()) { state.teachingOptions = null; useOfflineRooms(); switched = true; } }
   if (m.connected && window.CampusRuntimeReady && state.page === 'exams' && state.examError) { state.examError = ''; setTimeout(() => loadExams(), 0); }
   // 只是连接状态变了：空教室页只换顶部状态，接着连教务时还会再画一次，不整页重画两遍；“我的”页的连接状态要跟着变。
   if (switched || state.page === 'me') render(); else if (state.page === 'rooms') roomsChrome();
-  if (m.connected && !onlineRooms() && window.CampusRuntimeReady) connectTeaching();
+  if (m.connected && !onlineRooms() && window.CampusRuntimeReady && !state.teachingAuto.busy) connectTeaching();
   return;
  }
  const was = state.libraryConnected;
@@ -457,7 +382,7 @@ function cancelLibraryReads() {
  queuedLibraryRead = null;
 }
 function resetReadOwnership() {
- cancelLibraryReads(); ++teachingEpoch; ++roomQueryGen; ++roomOptionsGen; ++untilToken;
+ teachingSession.reset(); cancelLibraryReads(); ++teachingEpoch; ++roomQueryGen; ++roomOptionsGen; ++untilToken;
  roomFormKey = null; roomAutoShown = false; roomDefaultsApplied = false;
  if (queuedRoomTask) queuedRoomTask.resolve(false);
  queuedRoomTask = null;
@@ -576,6 +501,28 @@ let compositionTarget = null, compositionOwner = '', pendingCompositionRender = 
 // A read reply must not replace a pressed control between pointerup and its compatibility click.
 let pointerRenderLock = null, pointerRenderTimer = 0, pendingPointerRender = false, pendingSettingsDraw = null;
 const inputOwner = () => state.activeAccountId + '|' + state.username + '|' + state.sessionEpoch;
+// Repository owns the connection lifecycle; UI fields are a projection only.
+const teachingSession = window.CampusTeachingSession.create({
+ scope: inputOwner,
+ connect: ({fresh}) => host('connectTeaching', {accountId: state.activeAccountId, fresh, sessionEpoch: state.sessionEpoch}),
+ prepare: async ({fresh}) => {
+  const owner = inputOwner();
+  for (let attempt = 0; attempt < 3; attempt++) {
+   if (attempt) await sleep(1500);
+   if (owner !== inputOwner()) throw authStale();
+   if (onlineRooms() && !fresh) return;
+   try { await loadTeachingOptions(); return; }
+   catch (e) { if (e.code !== 'PAGE' || attempt === 2) throw e; }
+  }
+ },
+ changed: snapshot => {
+  const a = state.teachingAuto;
+  Object.assign(a, {phase: snapshot.phase, busy: snapshot.phase === 'connecting', tried: snapshot.phase !== 'idle', needsUser: snapshot.needsUser, retryAt: snapshot.retryAt, error: snapshot.error});
+  if (snapshot.phase === 'ready') { state.teachingConnected = true; if (state.page === 'rooms') render(); }
+  else if (snapshot.phase === 'retryable' && !a.error) a.error = snapshot.offline ? '暂时连不上教务，稍后自动重试，也可以手动重试。' : '自动连接未完成，可重试或在学校页面登录。';
+  roomsChrome();
+ }
+});
 function releasePointerRender(flush = true) {
  clearTimeout(pointerRenderTimer);pointerRenderTimer=0;pointerRenderLock=null;
  const redraw=pendingPointerRender,settings=pendingSettingsDraw,owner=inputOwner(),page=state.page;pendingPointerRender=false;pendingSettingsDraw=null;
@@ -882,7 +829,7 @@ function updateAccountChip() {
  const ok = state.libraryConnected, bad = restricted();
  $('#accountDot').classList.toggle('ok', ok && !bad);
  $('#accountDot').classList.toggle('err', bad);
- $('#accountChipText').textContent = state.supportsAccounts ? account().label : !ok ? '未登录' : bad ? state.profile.statusText || '状态异常' : state.profile?.name ? C.givenName(state.profile.name) : '已登录';
+ $('#accountChipText').textContent = state.supportsAccounts ? account().label : !ok ? state.libraryAuto.busy ? '连接中' : state.libraryAuth?.phase === 'retryable' ? '待重连' : '未登录' : bad ? state.profile.statusText || '状态异常' : state.profile?.name ? C.givenName(state.profile.name) : '已登录';
  $('#account').setAttribute('aria-label', '账号与登录，图书馆' + (ok ? '已连接' : '未登录') + (bad ? '，学校账号状态：' + (state.profile.statusText || '异常') : ''));
 }
 function updateTaskBadge() {
@@ -977,6 +924,7 @@ function libraryLoginCard() {
  if (state.bootPending) return '<section class="card hero"><h2>' + (state.bootError ? '本机信息读取失败' : '正在读取登录信息…') + '</h2><p class="muted">' + esc(state.bootError || '正在恢复本机保存状态。') + '</p>' + (state.bootError ? '<button class="btn filled" data-action="retryStartup">重新读取</button>' : '') + '</section>';
  if (state.libraryAuth?.phase === 'mismatch') return '<section class="card hero"><h2>学校账号与当前账号不一致</h2><p class="muted">本机数据已保留，请核对学校登录身份。</p><button class="btn filled" data-action="loginLibrary">核对学校账号</button><button class="btn text" data-action="account">查看账号</button></section>';
  if (a.busy) return '<section class="card hero"><div class="hero-icon">' + I.library + '</div><h2>正在自动登录图书馆…</h2><p class="muted">使用已保存的账号，稍等几秒。</p><div class="loader" aria-hidden="true"><i></i></div><button class="btn text" data-action="account">查看账号</button></section>';
+ if (state.libraryAuth?.phase === 'retryable' && state.libraryAuth.code !== 'STORAGE') return '<section class="card hero"><div class="hero-icon">' + I.library + '</div><h2>正在恢复学校连接</h2><p class="muted">登录信息已保留，网络恢复后会自动重试，无需重新填写账号密码。</p><button class="btn filled wide" data-action="refresh">重试连接</button><button class="btn text" data-action="account">查看账号</button></section>';
  if (a.failed && state.hasCredentials) return '<section class="card hero"><div class="hero-icon">' + I.library + '</div><h2>' + (a.needsUser ? '需要你完成一次验证' : '自动登录没有完成') + '</h2><p class="muted">' + (a.needsUser ? '学校要求验证码或短信，完成后自动返回。' : '网络或学校系统暂时不可用。') + '</p><button class="btn filled wide" data-action="loginLibrary">' + (a.needsUser ? '打开登录页' : '登录图书馆') + '</button><button class="btn text" data-action="account">修改已存账号</button></section>';
  return '<section class="card hero"><div class="hero-icon">' + I.library + '</div><h2>登录图书馆</h2><p class="muted">使用学校统一认证' + (state.hasCredentials ? '，自动填写已存密码' : '') + '。</p><button class="btn filled wide" data-action="loginLibrary">登录图书馆</button>' + '<button class="btn text" data-action="account">' + (state.hasCredentials ? '查看已存账号' : '设置自动登录') + '</button>' + '</section>';
 }
@@ -1068,12 +1016,12 @@ for (const type of ['pointerup','pointercancel']) document.addEventListener(type
 document.addEventListener('focusout', () => { const x = pendingNotifyPatch; if (x) setTimeout(() => patchSettingsNotify(x.revision,x.owner),0); });
 function onResume() {
  if (!window.CampusRuntimeReady) return;
- const resumeOwner = inputOwner(), resumeOverlay = overlayRevision;
+ const resumeOwner = inputOwner(), resumeOverlay = overlayRevision, dayRolled = rollDay();
  if (Date.now() - (state.preferences.opens?.at || 0) > 30 * 60000) countOpen();
  refreshNotify().then(() => { if (resumeOwner !== inputOwner() || !window.CampusRuntimeReady) return; syncLiveSeat(); const d = $('#dialog'); if (d.open) patchSettingsNotify(resumeOverlay,resumeOwner); else if (resumeOverlay === overlayRevision) updateAccountChip(); });
  if (state.libraryConnected && !state.reading.current && Date.now() - state.currentAt > 60000) busy(refreshCurrent, {quiet: true, kind: 'current'});
  // 在座位页离开一会儿再回来：座位多半已经变了，超过 2 分钟就悄悄重读，已选的、还空着的留着
- if (state.page === 'library' && state.libraryConnected && state.areaId && state.info && !state.reading.library && Date.now() - (state.seatsAt || 0) > 120000) refreshAfterBooking({keep: true});
+ if (!dayRolled && state.page === 'library' && state.libraryConnected && state.areaId && state.info && !state.reading.library && Date.now() - (state.seatsAt || 0) > 120000) refreshAfterBooking({keep: true});
  if (['tasks', 'me'].includes(state.page) && state.libraryConnected && !state.recordsLoaded && !state.reading.records) loadRecords(true);
  if (state.page === 'me') loadAccountStatus();
  if (state.page === 'rooms' && !onlineRooms()) autoConnectTeaching();
@@ -1110,8 +1058,8 @@ async function quickTomorrow() {
  bookDialog();
 }
 function queryBar(withLibraries) {
- const today = C.nowChina(), tomorrow = addDays(today, 1);
- const day = (d, label) => '<button class="chip' + (state.day === d ? ' on' : '') + '" data-day="' + d + '" aria-pressed="' + (state.day === d) + '">' + label + ' <span class="muted">' + md(d) + '</span></button>';
+ const today = C.nowChina(), tomorrow = addDays(today, 1), first = earliestBookingDay();
+ const day = (d, label) => '<button class="chip' + (state.day === d ? ' on' : '') + '" data-day="' + d + '" aria-pressed="' + (state.day === d) + '"' + (d < first ? ' disabled' : '') + '>' + (d < first ? label + '（已结束）' : label) + ' <span class="muted">' + md(d) + '</span></button>';
  let h = '<div class="query-bar"><div class="chip-row" role="group" aria-label="使用日期">' + day(today, '今天') + day(tomorrow, '明天') + '</div>';
  if (withLibraries && state.catalog.length > 1) h += state.catalog.length <= 3
   ? '<div class="chip-row" role="group" aria-label="图书馆">' + state.catalog.map(l => '<button class="chip' + (same(l.id, state.libraryId) ? ' on' : '') + '" data-library="' + esc(l.id) + '" aria-pressed="' + same(l.id, state.libraryId) + '">' + esc(l.name) + '</button>').join('') + '</div>'
@@ -1227,6 +1175,7 @@ function selectionPanel() {
   + '<button class="btn filled grow" data-action="book"' + (n ? '' : ' disabled') + '>立即预约</button></div></div>';
 }
 function loadLibrary({quiet = false} = {}) {
+ normalizeBookingDay();
  // 日期可以随时切换。底层在途请求仍等返回，只保留一个待执行的最新只读意图。
  const request = {epoch: ++libraryEpoch, owner: inputOwner(), day: state.day, libraryId: state.libraryId, areaId: state.areaId, keep: state.selection.slice(), quiet};
  const result = new Promise(resolve => { request.resolve = resolve; });
@@ -1287,7 +1236,8 @@ async function loadSeats(id, reset = false) {
 function libraryInputLocked() { if (!state.reading.library && !state.reading.account) return false; toast('当前数据仍在读取，请稍候再选择区域或座位'); return true; }
 function backToAreas() { haptic('tick'); cancelLibraryReads(); state.openingArea = ''; state.info = null; state.seats = []; state.selection = []; state.areaId = ''; transition('back', () => { render(); window.scrollTo(0, 0); }); save().catch(() => {}); }
 async function changeDay(day) {
- if (!C.validDay(day) || day === state.day) return false;
+ if (!C.validDay(day) || day < earliestBookingDay()) { if (C.validDay(day)) toast('今天的预约已结束，已显示明天'); return false; }
+ if (day === state.day) return false;
  if (state.reading.account) { toast('正在切换账号，请稍候'); return false; }
  state.day = day; state.areas = []; state.info = null; state.seats = []; state.selection = []; state.openingArea = ''; state.updated = ''; state.error = '';
  return loadLibrary();
@@ -1364,6 +1314,7 @@ function takeJustBooked(no) {
  return hit;
 }
 function bookDialog() {
+ if (normalizeBookingDay()) { toast('今天的预约已结束，请选择明天的座位'); loadLibrary(); return; }
  if (libraryInputLocked() || !state.info || !state.selection.length) return;
  const t = baseTask();
  if (state.kind === 1 && !state.segment) { toast('请先选择学校固定时段'); return; }
@@ -1375,6 +1326,7 @@ function bookDialog() {
 }
 async function confirmBook() {
  if (creatingTasks || !pendingBooking || !$('#dialog').open || $('#dialog').dataset.kind !== 'book') return;
+ if (pendingBooking.day < earliestBookingDay()) { pendingBooking = null; closeDialog(); normalizeBookingDay(); toast('今天的预约已结束，请重新选择明天的座位'); await loadLibrary(); return; }
  lastBooking = structuredClone(pendingBooking);
  const t = C.validateTask({...pendingBooking, fireAt: new Date(Date.now() + 200).toISOString()});
  // 连点“确认预约”只算一次；按下就显示“正在提交”
@@ -1678,26 +1630,13 @@ async function syncOfflineRooms(force = false) {
  return ok || (keep || !old ? 'partial' : false);
 }
 // 后台连接教务（不占用界面的加载状态），连上后由 acceptTeachingOptions 接着同步。
-// 学校要验证码、或已存的密码不对时（needsUser）不在后台反复提交密码；没连上就隔 3 小时再自动试，手动“连接教务”不受影响。
+// 临时错误按会话退避时间重试；需要本人处理时停止自动尝试，手动连接可重试。
 async function backgroundTeaching({fresh = false, manual = false} = {}) {
- if (onlineRooms()) return true;
- if (teachingConnecting || state.teachingAuto.busy || state.teachingAuto.needsUser || !['android', 'windows'].includes(state.platform)) return false;
- const accountId = state.activeAccountId, owner = inputOwner(), ok = await (async () => {
-  try {
-   const r = await host('connectTeaching', {accountId, fresh});
-   if (owner !== inputOwner()) return false;
-   if (r?.needsUser && accountId === state.activeAccountId) { state.teachingAuto.needsUser = true; roomsChrome(); }
-   if (!r?.connected) return false;
-   for (let i = 0; i < 3; i++) {
-    if (i) await sleep(1500);
-    if (onlineRooms()) return true;
-    if (owner !== inputOwner()) return false;
-    try { await loadTeachingOptions(); if (state.page === 'rooms') render(); return true; } catch (e) { if (e.code !== 'PAGE') return false; }
-   }
-  } catch (e) {}
-  return false;
- })();
- if (owner === inputOwner() && !ok && !manual) roomSync.next = Math.max(roomSync.next, Date.now() + 3 * 3600000);
+ if (onlineRooms() && !fresh) return true;
+ if (!window.CampusRuntimeReady || !['android', 'windows'].includes(state.platform) || document.hidden || state.foreground === false || state.localStateBlocked) return false;
+ const owner = inputOwner();
+ const ok = await teachingSession.ensure({fresh, retry: manual && !state.teachingAuto.needsUser});
+ if (owner === inputOwner() && !ok && !manual) roomSync.next = Math.max(roomSync.next, state.teachingAuto.needsUser ? Date.now() + 3 * 3600000 : state.teachingAuto.retryAt || Date.now() + 30000);
  return ok;
 }
 function syncedFor(d, q, day) { return d?.synced === day && same(d.year, q.year) && same(d.term, q.term) && same(d.campus, q.campus); }
@@ -1993,20 +1932,8 @@ async function changeRoomForm(form, name) {
 }
 // 进入空教室时在后台自动连接教务：统一认证已登录时直接通过，否则用已存密码自动填写；要验证码时再请本人处理。
 async function autoConnectTeaching(force = false, fresh = false) {
- const a = state.teachingAuto;
- if (onlineRooms() || a.busy || teachingConnecting || !force && a.tried || !['android', 'windows'].includes(state.platform)) return;
- Object.assign(a, {tried: true, busy: true, needsUser: false, error: ''});
- roomsChrome();
- let r = null;
- const accountId = state.activeAccountId, owner = inputOwner();
- try { r = await host('connectTeaching', {accountId, fresh}); }
- catch (e) { if (e.code !== 'CLIENT') a.error = e.message; }
- a.busy = false;
- // 等待期间切换了账号：这份结果属于原账号，丢弃。
- if (owner !== inputOwner() || state.teachingAuto !== a) return;
- if (r?.connected) { state.teachingConnected = true; if (!onlineRooms()) await connectTeaching(); else roomsChrome(); return; }
- if (r) { a.needsUser = !!r.needsUser; if (!r.needsUser) a.error = r.offline ? '连不上教务系统（可能在维护，或需要校园网 / VPN），稍后再试。' : '自动连接没有完成' + (r.page ? '（停在 ' + r.page + '）' : '') + '，可以重试，或在学校页面登录。'; }
- roomsChrome();
+ if (!window.CampusRuntimeReady || onlineRooms() && !fresh || !['android', 'windows'].includes(state.platform) || document.hidden || state.foreground === false || state.localStateBlocked) return false;
+ return teachingSession.ensure({fresh, retry: force});
 }
 // 学校算的当前周不对时（开学推迟、调过周次），可以自己指定“本周是第几周”；记下指定的那天，之后按日期每周自动加一。
 function weekFixed(week) { const f = state.preferences.weekFix; return f?.week && f.day ? C.weekOf(C.nowChina(), f.week, f.day) : week; }
@@ -3277,7 +3204,9 @@ function navDragMove(nav,x) {
  const w=Math.min(navDrag.w*(motionOn()?1.12:1),Math.max(1,nav.clientWidth-12)),h=Math.min(navDrag.h*(motionOn()?1.16:1),Math.max(1,nav.clientHeight-4));
  const left=Math.min(Math.max(localX-w/2,6),nav.clientWidth-6-w),top=(navDrag.h-h)/2;
  // 统一左上原点；用放大后的可见宽度夹边，指尖在可用范围内始终对齐胶囊中心。
- pill.style.transform='translate('+left+'px,'+top+'px) scale('+w/navDrag.w+','+h/navDrag.h+')';
+ const progress=motionOn()?Math.min(1,Math.max(0,(performance.now()-navDrag.started)/180)):1,eased=1-Math.pow(1-progress,3),from=navDrag.growFrom||{x:left,y:top,w,h};
+ const shown={x:from.x+(left-from.x)*eased,y:from.y+(top-from.y)*eased,w:from.w+(w-from.w)*eased,h:from.h+(h-from.h)*eased};
+ pill.style.transform='translate('+shown.x+'px,'+shown.y+'px) scale('+shown.w/navDrag.w+','+shown.h/navDrag.h+')';
  const over=navButtons(nav).find(b => { const q=b.getBoundingClientRect();return x>=q.left && x<q.right; })||null;
  if (over !== navDrag.over) { navDrag.over?.classList.remove('lens');over?.classList.add('lens');if (navDrag.over&&over) haptic('tick');navDrag.over=over; }
 }
@@ -3285,7 +3214,9 @@ function navDragStart(nav,x) {
  if (navDrag.on || navDrag.id == null) return;
  const pill=nav.querySelector('.nav-pill');if (!pill) return;
  if (pressed && nav.contains(pressed)) endPress(true);
- motion.cancel(pill);navDrag.w=Math.max(1,pill.offsetWidth);navDrag.h=Math.max(1,nav.clientHeight-12);navDrag.x=x;navDrag.on=true;
+ // Sample before cancelling an interrupted slide; grow from the painted rectangle.
+ navDrag.growFrom=navPillRect(nav,pill);navDrag.started=performance.now();
+ motion.cancel(pill);navDrag.w=Math.max(1,nav.querySelector('button[aria-current=page]')?.offsetWidth||pill.offsetWidth);navDrag.h=Math.max(1,nav.clientHeight-12);navDrag.x=x;navDrag.on=true;
  pill.style.width=navDrag.w+'px';pill.style.height=navDrag.h+'px';pill.style.transformOrigin='0 0';
  nav.classList.add('dragging');haptic('tap');
  try { nav.setPointerCapture(navDrag.id); } catch (error) {}
@@ -3302,6 +3233,8 @@ function navDragEnd(nav,commit) {
  if (navDrag.on) navDragMove(nav,navDrag.x);
  const was=navDrag.on,target=navDrag.over,id=navDrag.id,pill=nav.querySelector('.nav-pill'),from=was&&pill?navPillRect(nav,pill):null;
  navDrag.id=null;navDrag.on=false;navDrag.over?.classList.remove('lens');navDrag.over=null;
+ try { if(id!=null&&navDrag.captureTarget?.hasPointerCapture(id))navDrag.captureTarget.releasePointerCapture(id); } catch(error) {}
+ navDrag.captureTarget=null;navDrag.growFrom=null;
  try { if(id!=null&&nav.hasPointerCapture(id))nav.releasePointerCapture(id); } catch(error) {}
  if (!was) return;
  nav.classList.remove('dragging');navDrag.ate=commit?Date.now()+400:0;pillAt='';
@@ -3313,22 +3246,25 @@ function navDragEnd(nav,commit) {
  const nav=$('.nav');if(!nav)return;
  nav.addEventListener('pointerdown',e=>{
   if(!e.isPrimary||e.button!==0||getComputedStyle(nav).position!=='fixed'||navDrag.id!=null||!nav.querySelector('.nav-pill'))return;
-  navDrag.id=e.pointerId;navDrag.x0=navDrag.x=e.clientX;navDrag.y0=e.clientY;navDrag.ate=0;
+  navDrag.id=e.pointerId;navDrag.x0=navDrag.x=e.clientX;navDrag.y0=e.clientY;navDrag.ate=0;navDrag.trackWidth=nav.offsetWidth;
+  // Capture the original button so a short tap retains its normal click target.
+  navDrag.captureTarget=e.target.closest?.('button[data-page]')||nav;
+  try { navDrag.captureTarget.setPointerCapture(e.pointerId); } catch(error) {}
   navDrag.timer=setTimeout(()=>{if(navDrag.id===e.pointerId)navDragStart(nav,navDrag.x);},250);
  });
  nav.addEventListener('pointermove',e=>{
   if(e.pointerId!==navDrag.id)return;
   const dx=e.clientX-navDrag.x0,dy=e.clientY-navDrag.y0;navDrag.x=e.clientX;
-  if(!navDrag.on&&Math.abs(dy)>8&&Math.abs(dy)>Math.abs(dx)){navDragEnd(nav,false);endPress(true);return;}
+  if(!navDrag.on&&Math.abs(dy)>18&&Math.abs(dy)>Math.abs(dx)*1.5){navDragEnd(nav,false);endPress(true);return;}
   if(!navDrag.on&&Math.abs(dx)>10){clearTimeout(navDrag.timer);navDragStart(nav,e.clientX);}
   if(navDrag.on&&!navDrag.frame)navDrag.frame=requestAnimationFrame(()=>navDragFrame(nav));
  });
  window.addEventListener('pointerup',e=>{if(e.pointerId===navDrag.id){navDrag.x=e.clientX;navDragEnd(nav,true);}});
  window.addEventListener('pointercancel',e=>{if(e.pointerId===navDrag.id)navDragEnd(nav,false);});
- nav.addEventListener('lostpointercapture',e=>{if(e.pointerId===navDrag.id)navDragEnd(nav,false);});
+ nav.addEventListener('lostpointercapture',e=>{if(e.target===nav&&e.pointerId===navDrag.id)navDragEnd(nav,false);});
  window.addEventListener('blur',()=>navDragEnd(nav,false));
  document.addEventListener('visibilitychange',()=>{if(document.hidden)navDragEnd(nav,false);});
- window.addEventListener('resize',()=>{if(navDrag.id!=null)navDragEnd(nav,false);});
+ window.addEventListener('resize',()=>{if(navDrag.id!=null&&nav.offsetWidth!==navDrag.trackWidth)navDragEnd(nav,false);});
  nav.addEventListener('touchmove',e=>{if(navDrag.on&&e.cancelable)e.preventDefault();},{passive:false});
  nav.addEventListener('contextmenu',e=>e.preventDefault());
  for(const k of ['selectstart','contextmenu','dragstart'])document.addEventListener(k,e=>{if(navDrag.id!=null)e.preventDefault();},true);
@@ -3468,14 +3404,12 @@ async function init() {
   state.preferences.manualReminders = Array.isArray(saved.manualReminders) ? saved.manualReminders : [];
   state.preferences.firedReminders = Array.isArray(saved.firedReminders) ? saved.firedReminders : [];
   state.libraryId = saved.libraryId || '';
-  // 晚上 10 点以后多半是在约明天
-  const lateDefault = chinaHour() >= 22 && !window.CampusFixedDay;
-  if (lateDefault) state.day = addDays(C.nowChina(), 1);
+  state.day = earliestBookingDay();
   state.areaId = saved.areaId || '';
   const navigation = d.state?.navigation;
   if (intent === navigationIntent && navigation && !PAGES[d.launchPage]) {
    if (PAGES[navigation.page]) state.page = pageFor(navigation.page);
-   if (C.validDay(navigation.day) && navigation.day >= C.nowChina() && navigation.day <= addDays(C.nowChina(), 7)) state.day = navigation.day;
+   if (C.validDay(navigation.day) && navigation.day >= earliestBookingDay() && navigation.day <= addDays(C.nowChina(), 7)) state.day = navigation.day;
    for (const entry of Array.isArray(navigation.positions) ? navigation.positions.slice(0, 6) : []) {
     const [page, position] = Array.isArray(entry) ? entry : [];
     if (PAGES[page] && position && typeof position.context === "string" && position.context.length < 4096 && Number.isFinite(position.top) && position.top >= 0) pagePositions.set(page, position);
@@ -3504,15 +3438,12 @@ async function init() {
   // 紧接着读图书馆时会再画一次；只有弹过协议才需要先刷新一下
   render();
   if (state.platform === 'android') { refreshNotify().then(() => { if (current()) syncLiveSeat(); }); }
-  const startupDay = state.day;
-  const initialLibraryRead = await loadLibrary(); if (!current()) return;
-  if(state.libraryConnected)performance.mark?.('school_data_ready');
-  // 学校还没开放明天的预约时（没有区域），回到今天，不要一打开就是空白
-  if (initialLibraryRead && intent === navigationIntent && startupDay === state.day && lateDefault && state.libraryConnected && !state.areas.length && state.day !== C.nowChina()) { state.day = C.nowChina(); await loadLibrary(); }
-  syncReminders();
-  if (['tasks', 'me'].includes(state.page) && state.libraryConnected && !state.recordsLoaded) loadRecords(true);
   if (state.page === 'rooms') autoConnectTeaching();
   if (state.page === 'exams') maybeRefreshExams();
+  await loadLibrary(); if (!current()) return;
+  if(state.libraryConnected)performance.mark?.('school_data_ready');
+  syncReminders();
+  if (['tasks', 'me'].includes(state.page) && state.libraryConnected && !state.recordsLoaded) loadRecords(true);
  } catch (e) { if (!current()) return; state.error = e.message; if (!window.CampusRuntimeReady) state.bootError = e.message; $('#platform').textContent = '客户端未连接'; render(); }
 }
 setInterval(tick, 1000);

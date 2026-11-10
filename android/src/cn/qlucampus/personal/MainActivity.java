@@ -311,7 +311,7 @@ public class MainActivity extends Activity {
   // sawSso 只用于判断图书馆登录是否真的经过统一认证；后台教务连接经过统一认证时不算。
   @Override public boolean shouldOverrideUrlLoading(WebView w,WebResourceRequest r){if(system.equals("library")&&"sso.qlu.edu.cn".equals(r.getUrl().getHost()))sawSso=true;return !"https".equals(r.getUrl().getScheme());}
   @Override public void onPageStarted(WebView w,String url,android.graphics.Bitmap icon){if(destroyed||!ownsOfficialView(w,system))return;closeReplyChannel(w);if(system.equals("teaching"))teachingNavFailed=false;else if(system.equals("library")&&"sso.qlu.edu.cn".equals(Uri.parse(url).getHost()))sawSso=true;}
-  @Override public void onReceivedError(WebView w,WebResourceRequest r,WebResourceError e){if(destroyed||!ownsOfficialView(w,system))return;if(system.equals("teaching")&&r.isForMainFrame()){teachingNavFailed=true;if(!connectIds.isEmpty()){final int seq=connectSeq;handler.postDelayed(()->{if(!destroyed&&w==teaching&&seq==connectSeq&&teachingNavFailed&&!connectIds.isEmpty())finishConnect(false,false);},2000);}}}
+  @Override public void onReceivedError(WebView w,WebResourceRequest r,WebResourceError e){if(destroyed||!ownsOfficialView(w,system))return;if(system.equals("libbg")&&r.isForMainFrame()){finishBackgroundFailure(w,activeRestoreAttempt,false);return;}if(system.equals("teaching")&&r.isForMainFrame()){teachingNavFailed=true;if(!connectIds.isEmpty()){final int seq=connectSeq;handler.postDelayed(()->{if(!destroyed&&w==teaching&&seq==connectSeq&&teachingNavFailed&&!connectIds.isEmpty())finishConnect(false,false);},2000);}}}
   @Override public void onPageFinished(WebView w,String url){if(destroyed||!ownsOfficialView(w,system))return;Uri u=Uri.parse(url);String path=u.getPath()==null?"":u.getPath();if(system.equals("library")&&"sso.qlu.edu.cn".equals(u.getHost()))sawSso=true;if((system.equals("library")||system.equals("libbg"))&&"libyuyue.qlu.edu.cn".equals(u.getHost()))readSession(w);if(system.equals("pass")&&!"sso.qlu.edu.cn".equals(u.getHost())){passTrimmed=hideBorrow();if(passTrimmed)w.evaluateJavascript(PASS_TRIM,null);}
    if(system.equals("teaching")&&"jw.qlu.edu.cn".equals(u.getHost())){
     // 未登录访问 /jwglxt/ 会落到验证码登录页：改走统一认证入口，每次尝试最多 2 次，防止统一认证异常时循环；不重置已填写标记，错误密码不会被反复提交。
@@ -348,7 +348,7 @@ public class MainActivity extends Activity {
   if(connectIds.isEmpty())return;handler.removeCallbacks(connectTimeout);if(!connectProbe.isEmpty()){requests.remove(connectProbe);connectProbe="";}
   JSONObject r=new JSONObject();try{r.put("connected",ok);if(!ok){String url=teaching==null?null:teaching.getUrl();Uri u=Uri.parse(url==null?"":url);String host=u.getHost()==null?"":u.getHost(),path=u.getPath()==null?"":u.getPath();r.put("needsUser",!teachingNavFailed&&needsUser(u));r.put("offline",teachingNavFailed);r.put("page",host+path);}}catch(Exception e){}
   List<String> ids=new ArrayList<>(connectIds);connectIds.clear();for(String id:ids)reply(id,r);
-  if(ok&&event)sessionTeaching(true);
+  if(ok){CookieManager.getInstance().flush();backupCookies();}if(ok&&event)sessionTeaching(true);
  }
 
  String resetRequestId="";boolean resetInProgress=false;
@@ -623,6 +623,7 @@ private void publishAuthentication() {
 
 void sessionEvent(boolean ignoredConnectedArgument) {
     identityVerified = libraryRecovery.verified();
+    if (identityVerified) { android.webkit.CookieManager.getInstance().flush(); backupCookies(); }
     try {
         send(addAuthenticationMetadata(new org.json.JSONObject().put("event", "sessionChanged")
                 .put("system", "library").put("connected", identityVerified)));
@@ -826,6 +827,7 @@ private void kickAuthenticationRecovery() {
     if (!authEligible()) return;
     if (!vault.optString("token").isEmpty()) verifyLibraryIdentity();
     else autoRestore();
+    retryIdentityLater();
 }
 
 void verifyLibraryIdentity() {
@@ -838,16 +840,20 @@ void verifyLibraryIdentity() {
     request(id, "library", "profile", new org.json.JSONObject());
 }
 
+private Runnable authenticationRetry;
 private void retryIdentityLater() {
+    if (authenticationRetry != null) handler.removeCallbacks(authenticationRetry);
+    authenticationRetry = null;
     LibraryIdentityRecovery.Snapshot snapshot = libraryRecovery.snapshot();
-    if (!"retryable".equals(snapshot.phase) || "STORAGE".equals(snapshot.code) || snapshot.retryAt == 0
-            || libraryRecovery.probesThisRound() >= LibraryIdentityRecovery.MAX_PROBES_PER_ROUND) return;
+    if (!authEligible() || !"retryable".equals(snapshot.phase) || "STORAGE".equals(snapshot.code) || snapshot.retryAt == 0) return;
     final LibraryIdentityRecovery.Owner owner = libraryRecovery.owner();
     final long revision = snapshot.revision;
-    handler.postDelayed(() -> {
+    authenticationRetry = () -> {
+        authenticationRetry = null;
         if (!libraryRecovery.owns(owner) || libraryRecovery.snapshot().revision != revision || !authEligible()) return;
-        verifyLibraryIdentity();
-    }, Math.max(0, snapshot.retryAt - System.currentTimeMillis()));
+        kickAuthenticationRecovery();
+    };
+    handler.postDelayed(authenticationRetry, Math.max(0, snapshot.retryAt - System.currentTimeMillis()));
 }
 
 private boolean rejectCurrentLibraryToken(LibraryIdentityRecovery.Owner owner) {
@@ -955,7 +961,13 @@ void autoRestore() {
         libraryLoginEvent("started", false);
         view.loadUrl(LIB_CAS);
         pollSession(sequence, 0);
-        handler.postDelayed(() -> finishBackgroundFailure(view, attempt, true), 40_000);
+        handler.postDelayed(() -> {
+            if (view != activeRestoreView || attempt != activeRestoreAttempt || !libraryRecovery.owns(attempt)) return;
+            String url = view.getUrl();
+            // A transport timeout away from SSO is not a request for user verification.
+            boolean challenge = bgUsed && url != null && needsUser(android.net.Uri.parse(url));
+            finishBackgroundFailure(view, attempt, challenge);
+        }, 40_000);
     } catch (Exception e) { finishBackgroundFailure(view, attempt, false); }
 }
 
@@ -973,7 +985,7 @@ private void finishBackgroundFailure(android.webkit.WebView expected, LibraryIde
     if (expected != activeRestoreView || attempt != activeRestoreAttempt || !libraryRecovery.owns(attempt)) return;
     libraryRecovery.restoreFailed(attempt, needsUser, System.currentTimeMillis());
     disposeBackgroundView(expected, attempt);
-    libraryLoginEvent("failed", needsUser); publishAuthentication();
+    libraryLoginEvent("failed", needsUser); publishAuthentication(); retryIdentityLater();
 }
 
 void endBackgroundLogin(boolean success) {
@@ -1043,6 +1055,8 @@ void readSession(android.webkit.WebView view) {
             org.json.JSONObject next = new org.json.JSONObject(vault.toString());
             next.put("token", token);
             commitVault(next, false, owner.epoch);
+            android.webkit.CookieManager.getInstance().flush();
+            backupCookies();
             acceptedLoginTokens.put(view, token);
             libraryRecovery.installedToken(true);
             identityVerified = false;
@@ -1267,6 +1281,8 @@ final class ApiReply {
 }
 
 private void authOnPause() {
+    if (authenticationRetry != null) handler.removeCallbacks(authenticationRetry);
+    authenticationRetry = null;
     libraryRecovery.suspend(System.currentTimeMillis());
     if (activeRestoreView != null) disposeBackgroundView(activeRestoreView, activeRestoreAttempt);
     publishAuthentication();

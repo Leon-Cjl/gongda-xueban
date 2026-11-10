@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+ <string name="app_name">工大学伴</string>
  <string name="shortcut_pass">入馆码</string>
  <string name="shortcut_pass_long">出示图书馆入馆码</string>
  <string name="shortcut_rooms">空教室</string>

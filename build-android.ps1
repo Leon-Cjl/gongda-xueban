@@ -1,4 +1,4 @@
-param(
+﻿param(
  [string]$ToolsRoot,     # 放 jdk / android-platform / android-build 的目录，默认 .\tools
  [string]$KeyStorePath,  # 自己的签名；不给就在 android\signing 里生成一把本机签名（不进 git）
  [string]$KeyAlias='gongda'
@@ -45,7 +45,11 @@ if($LASTEXITCODE -ne 0){throw 'Zip alignment failed'}
 # 4. 签名：用你给的 keystore（apksigner 会交互式询问密码），否则在 android\signing 生成一把本机签名
 $taskApk="$taskOut\工大学伴-$taskVersion.apk"
 if($KeyStorePath){
+ if($env:GONGDA_SIGNING_PASSWORD){
+  & "$taskJdk\bin\java.exe" -jar "$taskBuild\lib\apksigner.jar" sign --ks ([IO.Path]::GetFullPath($KeyStorePath)) --ks-key-alias $KeyAlias --ks-pass env:GONGDA_SIGNING_PASSWORD --key-pass env:GONGDA_SIGNING_PASSWORD --out $taskApk "$taskStage\aligned.apk"
+ } else {
  & "$taskJdk\bin\java.exe" -jar "$taskBuild\lib\apksigner.jar" sign --ks ([IO.Path]::GetFullPath($KeyStorePath)) --ks-key-alias $KeyAlias --out $taskApk "$taskStage\aligned.apk"
+ }
 }else{
  $taskKey="$taskRoot\android\signing\local.jks";$taskPassFile="$taskRoot\android\signing\local.pass"
  if(-not (Test-Path -LiteralPath $taskKey)){

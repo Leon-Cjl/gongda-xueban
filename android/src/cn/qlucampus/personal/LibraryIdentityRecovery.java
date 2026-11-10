@@ -33,7 +33,7 @@ public final class LibraryIdentityRecovery {
     private long epoch, generation, revision, serial;
     private String phase = "idle", code = "";
     private long retryAt, nextProbeAt;
-    private int probeCount;
+    private int probeCount, restoreFailures;
     private boolean hasToken, hasCredentials, automaticUsed;
     private Probe probe;
     private RestoreAttempt restore;
@@ -44,7 +44,7 @@ public final class LibraryIdentityRecovery {
         epoch = newEpoch;
         generation++;
         hasToken = token; hasCredentials = credentials; automaticUsed = false;
-        probe = null; restore = null; probeCount = 0; nextProbeAt = 0;
+        probe = null; restore = null; probeCount = 0; restoreFailures = 0; nextProbeAt = 0;
         phase = "idle"; code = ""; retryAt = 0; revision++;
     }
     public Owner owner() { return new Owner(epoch, generation); }
@@ -104,7 +104,7 @@ public final class LibraryIdentityRecovery {
     }
     public boolean verifiedAfterCommit(Probe ticket) {
         if (!owns(ticket)) return false;
-        probe = null;
+        probe = null; automaticUsed = false; restoreFailures = 0;
         state("verified", "", 0);
         return true;
     }
@@ -134,7 +134,7 @@ public final class LibraryIdentityRecovery {
         state("retryable", "STORAGE", 0);
     }
     public RestoreAttempt beginRestore(long now, boolean eligible) {
-        if (!eligible || hasToken || !hasCredentials || automaticUsed || probe != null || restore != null
+        if (!eligible || now < retryAt || hasToken || !hasCredentials || automaticUsed || probe != null || restore != null
                 || "mismatch".equals(phase) || "STORAGE".equals(code) || "restoring".equals(phase)
                 || "needs_user".equals(phase)) return null;
         automaticUsed = true;
@@ -145,12 +145,17 @@ public final class LibraryIdentityRecovery {
     public boolean restoreFailed(RestoreAttempt ticket, boolean userNeeded, long now) {
         if (!owns(ticket)) return false;
         restore = null;
+        if (!userNeeded) automaticUsed = false;
+        restoreFailures++;
+        long delay = Math.min(300_000L, ROUND_COOLDOWN_MS * (1L << Math.min(4, restoreFailures - 1)));
         state(userNeeded ? "needs_user" : "retryable", userNeeded ? "VERIFY" : "NETWORK",
-                userNeeded ? 0 : now + ROUND_COOLDOWN_MS);
+                userNeeded ? 0 : now + delay);
         return true;
     }
     public void suspend(long now) {
         if (probe != null || restore != null) {
+            // A background interruption did not reject credentials or the token.
+            if (restore != null) automaticUsed = false;
             probe = null; restore = null;
             state("retryable", "PAUSED", now + PROBE_GAP_MS);
         }

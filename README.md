@@ -4,7 +4,7 @@
 
 **齐鲁工业大学校园小工具：图书馆选座 · 入馆码 · 签到提醒 · 空教室查询**
 
-<img src="https://img.shields.io/badge/版本-1.1.26-blue?style=flat-square" />
+<img src="https://img.shields.io/badge/版本-1.1.27-blue?style=flat-square" />
 <img src="https://img.shields.io/badge/platform-Android-green?style=flat-square&logo=android&logoColor=white" />
 <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows&logoColor=white" />
 <img src="https://img.shields.io/badge/language-JavaScript-yellow?style=flat-square&logo=javascript&logoColor=black" />
@@ -28,6 +28,10 @@
 
 ---
 
+## 本次更新
+
+同步主线至个人版 0.9.46 的共用改进，包括登录恢复、22:00 后日期选择、空教室与考试读取、弹窗和底栏交互。自动测试和浏览器合成场景通过；真实手机及学校账号尚未验证。
+
 ## 功能
 
 | 功能 | 说明 |
@@ -35,7 +39,7 @@
 | 📖 **图书馆** | 按楼层、空座筛选区域，看座位图，收藏常用座位，"立即预约" |
 | 📱 **入馆码** | 手机上一键打开电子借阅证，可放入快捷设置磁贴 |
 | ⏰ **签到提醒** | 预约开始前按设定时间提醒（系统闹钟，不常驻后台） |
-| 🏫 **空教室** | 按校区、教学楼、节次查空教室；离线缓存未来 7 天数据 |
+| 🏫 **空教室** | 按校区、教学楼、节次查空教室；自动保存今天和明天，可手动下载未来 7 天 |
 | 📊 **学习足迹** | 入馆日历、月度小结、成就（全部只用本机累积的学校记录计算） |
 | ⚙️ **我的** | 自动登录、主题与深浅色、倒计时、用户协议与隐私说明 |
 
