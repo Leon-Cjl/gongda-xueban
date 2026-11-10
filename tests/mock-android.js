@@ -88,7 +88,7 @@
  // Screenshot helpers: ?theme=dark&page=rooms&open=12&pick=204,212&query=1
  // badges=none：已用过但还没有勋章，记录读到后会获得“连续 3 天”。
  if(params.get('badges')==='none')seed.preferences.badges={default:{}};
- // 界面本身就是发布版（奶蛙版这类分支）而用例没指定 edition 时，按已同意协议启动，好让个人版用例也能跑。
+ // 测试使用演示环境，按已同意协议的状态启动。
  const consentScenario=['public','publicpc'].includes(params.get('case'))||params.get('edition')==='public'&&!params.has('case');
  if(window.CampusEdition==='public'&&!consentScenario)seed.preferences.consent=1;
  // opens=99：已经打开过 99 次、一个月前第一次用（发布版感谢弹窗）；donatehidden=1：收款码已收起。

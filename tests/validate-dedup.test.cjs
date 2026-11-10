@@ -1,5 +1,5 @@
 const {test} = require('node:test'), assert = require('node:assert/strict'), C = require('../app/core.js');
-// 从小璇璇版合并回来的校验与去重
+// 校验与去重
 const at = Date.parse('2026-10-19T08:00:00+08:00');
 const base = {areaId: 5, areaName: '测试区域', day: '2026-10-20', start: '08:30', end: '12:00', kind: 3, fireAt: new Date(at + 60000).toISOString(), seats: [{id: 1, no: '001'}]};
 

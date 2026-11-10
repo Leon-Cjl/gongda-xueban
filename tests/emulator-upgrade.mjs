@@ -12,4 +12,4 @@ try{
  check(after.state.favorites?.some(x=>x.key==='seat:qa:1')&&!Object.keys(after.state.preferences?.examCache||{}).length,'explicit recovery preserves favourites without assigning another identity exam cache');
  check((await host('qaCountWrites')).data.writes===0,'package replacement and legacy recovery never replay a school write');
 }catch(error){checks.push({ok:false,name:error.stack||error.message});process.exitCode=1;}
-finally{fs.writeFileSync(output,JSON.stringify({synthetic:true,scope:'isolated QA APK replacement plus legacy-format migration; existing personal installation untouched',checks,runtimeErrors:c?.errors||[]},null,2));console.log(JSON.stringify({checks:checks.length,failed:checks.filter(x=>!x.ok)}));c?.close();}
+finally{fs.writeFileSync(output,JSON.stringify({synthetic:true,scope:'isolated QA APK replacement plus legacy-format migration; existing installations untouched',checks,runtimeErrors:c?.errors||[]},null,2));console.log(JSON.stringify({checks:checks.length,failed:checks.filter(x=>!x.ok)}));c?.close();}

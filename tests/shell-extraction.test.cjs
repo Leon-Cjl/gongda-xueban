@@ -110,8 +110,8 @@ test('构建开关/版本常量沿用原回退逻辑', () => {
  assert.equal(publicEd.sandbox.CampusShell.PUBLIC, true);
  assert.equal(publicEd.sandbox.CampusShell.SHOWN_VERSION, '1.2.3', '发布版 SHOWN_VERSION 取 CampusEditionVersion');
  assert.equal(publicEd.sandbox.CampusShell.VERSION, '1.2.3', 'VERSION 优先取 CampusEditionVersion');
- const footerEd = loadShell({editionVersion: '0.9.30', footerText: '工大学伴 0.9.30'});
- assert.equal(footerEd.sandbox.CampusShell.VERSION, '0.9.30', 'VERSION 应从 footer 文本匹配版本号');
+ const footerEd = loadShell({editionVersion: '1.1.27', footerText: '工大学伴 1.1.27'});
+ assert.equal(footerEd.sandbox.CampusShell.VERSION, '1.1.27', 'VERSION 应从 footer 文本匹配版本号');
 });
 
 function originalUiSource() {

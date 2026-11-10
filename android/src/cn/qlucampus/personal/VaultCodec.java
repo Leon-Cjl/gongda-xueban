@@ -11,7 +11,7 @@ import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
-/** The 0.9.40 format: one unsigned IV-length byte, IV, then AES-GCM ciphertext/tag.
+/** The encoded format: one unsigned IV-length byte, IV, then AES-GCM ciphertext/tag.
  *  No key creation, file deletion, logging or forgiving text conversion occurs here. */
 public final class VaultCodec {
     public static final int MAX_BYTES = 1024 * 1024;

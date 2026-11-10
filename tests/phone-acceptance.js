@@ -227,7 +227,7 @@
   if(scenario==='research'){
    const qAll=s=>[...document.querySelectorAll(s)];
    await wait(()=>window.CampusRuntimeReady&&idle()&&q('[data-area]'),'library ready');
-   check(['personal','public'].includes(window.CampusEdition),'new interaction checks run in the selected edition');
+   check(window.CampusEdition==='public','interaction checks run in the release edition');
    window.__examData=[
     {kch:'A',kcmc:'材料科学',ksmc:'期末考试',kssj:'2026-01-10(09:00-11:00)'},
     {kch:'B',kcmc:'材料科学',ksmc:'补考',kssj:'2026-01-20(09:00-11:00)'},
@@ -324,7 +324,7 @@
    await wait(()=>q('.donate img').naturalWidth>0,'donate image');checks.push('support card shows the payment code');
    click('[data-action="saveDonate"]');await wait(()=>window.__donateSaved&&q('#toast').textContent.includes('已保存'),'save donate');checks.push('payment code can be saved to the album');
    click('[data-action="hideDonate"]');await wait(()=>!q('.donate'),'hide donate');check(window.__saved?.preferences?.donateHidden===true,'support card can be hidden and the choice is kept');
-   click('[data-action="settings"]');await wait(()=>q('#donateOn'),'settings');check(!q('#donateOn').checked&&!!window.CampusEditionVersion&&q('#dialog').textContent.includes(window.CampusEditionVersion)&&!q('#dialog').textContent.includes('个人使用版'),'settings show the public version and the support switch');
+   click('[data-action="settings"]');await wait(()=>q('#donateOn'),'settings');check(!q('#donateOn').checked&&!!window.CampusEditionVersion&&q('#dialog').textContent.includes(window.CampusEditionVersion),'settings show the public version and the support switch');
    q('#donateOn').click();await wait(()=>q('.donate'),'donate back');checks.push('support card can be turned back on in settings');
    click('[data-action="settings"]');await wait(()=>q('#dialog [data-action="legal"]'),'settings legal');click('#dialog [data-action="legal"]');
    await wait(()=>q('#dialog').dataset.kind==='legal'&&q('.legal'),'legal view');check(q('#dialog').textContent.includes('你于'),'the agreement stays readable in settings with the consent date');
@@ -343,7 +343,7 @@
    click('.nav [data-page="me"]');await wait(()=>q('.donate')&&idle(),'donate card');
    check(!q('[data-action="saveDonate"]')&&q('.donate').textContent.includes('扫一扫'),'desktop support card asks to scan with the phone');
    click('[data-action="settings"]');await wait(()=>q('#dialog [data-action="withdrawConsent"]'),'settings');
-   check(!!window.CampusEditionVersion&&q('#dialog').textContent.includes(window.CampusEditionVersion)&&!q('#dialog').textContent.includes('个人使用版'),'settings show the public version');
+   check(!!window.CampusEditionVersion&&q('#dialog').textContent.includes(window.CampusEditionVersion),'settings show the public version');
    click('#dialog [data-action="withdrawConsent"]');await wait(()=>q('[data-action="confirmWithdraw"]'),'withdraw confirm');
    check(q('#dialog').textContent.includes('这台电脑'),'withdrawing names this computer');
    click('[data-action="confirmWithdraw"]');await wait(()=>window.__reset,'reset');checks.push('withdrawing consent clears all local data');
@@ -475,7 +475,6 @@
    check(!!q('.page-head .quote .src')&&q('.page-head .quote').offsetHeight>0&&q('.page-head .quote').textContent.length<60,'library header shows one short daily line with its source');
    check(!(q('#dialog').open&&q('#dialog').dataset.kind==='medal')&&!document.querySelector('.confetti'),'badges already earned before are recorded quietly the first time');
    check(!!q('.current .cheer'),'the current booking shows a short line from real records');
-   check(!document.querySelector('.donate'),'the personal edition has no support card');
    check(!q('#content').textContent.includes('其他日期')&&!q('#day')&&document.querySelectorAll('[data-day]').length===2,'date choice is only today and tomorrow');
    const areaCount=()=>document.querySelectorAll('[data-area]').length;
    click('[data-area-floor="三层"]');check(areaCount()===2,'floor filter keeps the areas on that floor');

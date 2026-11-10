@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -18,8 +18,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: System.Reflection.AssemblyTitle("工大学伴")]
 [assembly: System.Reflection.AssemblyProduct("工大学伴")]
 [assembly: System.Reflection.AssemblyDescription("工大学伴")]
-[assembly: System.Reflection.AssemblyVersion("0.9.30.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.9.30.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.27.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.1.27.0")]
 
 static class Program {
  [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
@@ -28,7 +28,7 @@ static class Program {
   try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch{try{SetProcessDpiAwareness(2);}catch{}}
   bool selftest=args.Contains("--selftest")||args.Contains("--ui-test"), created;
   int wipe=Array.IndexOf(args,"--wipe");if(wipe>=0&&!selftest&&CampusForm.PublicBuild(CampusForm.AppRoot)){int pid;if(wipe+1<args.Length&&int.TryParse(args[wipe+1],out pid)){try{System.Diagnostics.Process.GetProcessById(pid).WaitForExit(15000);}catch{}}CampusForm.WipeData(Path.Combine(CampusForm.AppRoot,"data"));}
-  using(var mutex=new Mutex(true,selftest?"QluCampusSelfTest":CampusForm.PublicBuild(CampusForm.AppRoot)?"GongdaXuebanApp":"QluCampusPersonalApp",out created)) {
+  using(var mutex=new Mutex(true,selftest?"QluCampusSelfTest":CampusForm.PublicBuild(CampusForm.AppRoot)?"GongdaXuebanApp":"QluCampusLocalApp",out created)) {
    if(!created){MessageBox.Show("工大学伴已经运行，请从系统托盘打开。","工大学伴");return;}
    Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
    Application.Run(new CampusForm(selftest,args.Contains("--ui-test")));
@@ -207,8 +207,6 @@ sealed class CampusForm:Form {
  object[] FixtureCurrent(){return new object[]{new{id="qa-reservation",type=1,no="001",nameMerge="模拟阅览区 A",statusMsg=fixtureAway?"暂离中":"使用中",canTemporaryLeave=!fixtureAway,temporarilyAway=fixtureAway}};}
  static string DataDirectory(string appRoot){
   string local=Path.Combine(appRoot,"data");var parent=Directory.GetParent(appRoot.TrimEnd(Path.DirectorySeparatorChar));
-  // 交付目录：工大学伴\个人版\<版本>\电脑版（旧版在 个人版\旧版\<版本>\电脑版），账号数据放 个人版\个人数据，各版本共用
-  for(var up=parent;up!=null&&up.Parent!=null;up=up.Parent){if(up.Name=="个人版"&&up.Parent.Name=="工大学伴"){string data=Path.Combine(up.FullName,"个人数据");Directory.CreateDirectory(data);return data;}if(up.Name=="齐鲁校园助手")break;}
   if(parent==null||parent.Name!="齐鲁校园助手")return local;
   string project=Path.GetFullPath(parent.FullName)+Path.DirectorySeparatorChar,shared=Path.GetFullPath(Path.Combine(project,"个人数据"));
   if(Directory.Exists(shared))return shared;

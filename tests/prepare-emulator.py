@@ -1,4 +1,4 @@
-"""Stage latest personal UI and an isolated synthetic activity; never alter release files."""
+"""Stage the application UI and an isolated synthetic activity; never alter release files."""
 from pathlib import Path
 import argparse, json, shutil, sys, zipfile
 
@@ -12,7 +12,7 @@ if len(sys.argv)>2 and sys.argv[2]=='normalize':
     raise SystemExit
 parser=argparse.ArgumentParser()
 parser.add_argument('--app-dir',type=Path)
-parser.add_argument('--edition',choices=['personal','public'],default='personal')
+parser.add_argument('--edition',choices=['public'],default='public')
 parser.add_argument('--version')
 options=parser.parse_args(sys.argv[2:])
 stage.mkdir(parents=True,exist_ok=True)
@@ -27,7 +27,7 @@ shutil.copytree(options.app_dir.resolve() if options.app_dir else root/'app',ass
 shutil.copy2(root/'android/public/donate.png',assets/'donate.png')
 index=(assets/'index.html').read_bytes().decode('utf-8')
 import re
-index=re.sub(r'工大学伴 [0-9.]+ · 个人使用版','工大学伴 '+version+' 调试',index)
+index=re.sub(r'工大学伴 [0-9.]+','工大学伴 '+version+' 调试',index)
 (assets/'index.html').write_bytes(index.encode('utf-8'))
 qa=assets/'qa';shutil.copytree(assets,qa,ignore=shutil.ignore_patterns('qa'),dirs_exist_ok=True)
 for name in ['mock-android.js','phone-acceptance.js','qa-clock.js']: shutil.copy2(root/'tests'/name,qa/name)

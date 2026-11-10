@@ -1,4 +1,4 @@
-param([string]$AppDirectory='',[ValidateSet('personal','public')][string]$Edition='personal',[string]$Version='')
+param([string]$AppDirectory='',[ValidateSet('public')][string]$Edition='public',[string]$Version='')
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path -Parent $PSScriptRoot
 $taskStage=Join-Path $taskRoot 'android/build/emulator-debug'
