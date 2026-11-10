@@ -2,9 +2,11 @@
 
 # 📚 工大学伴
 
+<img src="docs/readme-banner-20261110.png" alt="工大学伴宣传图：图书馆、教室和学习日程" width="100%" />
+
 **齐鲁工业大学校园小工具：图书馆选座 · 入馆码 · 签到提醒 · 空教室查询**
 
-<img src="https://img.shields.io/badge/版本-1.1.26-blue?style=flat-square" />
+<img src="https://img.shields.io/badge/版本-1.1.27-blue?style=flat-square" />
 <img src="https://img.shields.io/badge/platform-Android-green?style=flat-square&logo=android&logoColor=white" />
 <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows&logoColor=white" />
 <img src="https://img.shields.io/badge/language-JavaScript-yellow?style=flat-square&logo=javascript&logoColor=black" />
